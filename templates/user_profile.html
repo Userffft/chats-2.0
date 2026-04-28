@@ -1,1 +1,122 @@
 
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ user.username }} - ChatVerse</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: rgba(0,0,0,0.5);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .modal {
+            background: white;
+            border-radius: 20px;
+            width: 400px;
+            max-width: 90%;
+            animation: slideIn 0.2s ease-out;
+            position: relative;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+        .close-btn:hover { color: #333; }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+            border-radius: 20px 20px 0 0;
+        }
+        .avatar {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            overflow: hidden;
+        }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .content { padding: 30px; }
+        .role-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .role-owner { background: #ffd700; color: #333; }
+        .role-admin { background: #ff6b6b; color: white; }
+        .role-moderator { background: #4ecdc4; color: white; }
+        .role-helper { background: #45b7d1; color: white; }
+        .role-user { background: #95a5a6; color: white; }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        .friend-btn { background: #667eea; color: white; }
+        .admin-btn { background: #f39c12; color: white; }
+        .remove-btn { background: #e74c3c; color: white; }
+        button:hover { transform: translateY(-1px); }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="modal">
+        <span class="close-btn" onclick="window.location.href='/chat'">&times;</span>
+        <div class="header">
+            <div class="avatar">
+                {% if user.avatar %}
+                    <img src="{{ user.avatar }}" alt="avatar">
+                {% else %}
+                    👤
+                {% endif %}
+            </div>
+            <h3>{{ user.username }}</h3>
+            <div class="role-badge role-{{ user.role }}">
+                {% if user.role == 'owner' %}👑 Владелец
+                {% elif user.role == 'admin' %}⚙️ Админ
+                {% elif user.role == 'moderator' %}🛡️ Модератор
+                {% elif user.role == 'helper' %}🆘 Хелпер
+                {% else %}👤 Пользователь{% endif %}
+            </div>
+            <div style="font-size: 12px; margin-top: 5px;">ID: {{ user.user_id_display }}</div>
+        </div>
+        <div class="content">
+            <p><strong>📝 О себе:</strong> {{ user.bio or 'Не указано' }}</p>
+            <p><strong>📅 Дата регистрации:</strong> {{ user.created_at.strftime('%d.%m.%Y') }}</p>

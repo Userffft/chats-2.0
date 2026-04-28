@@ -3,14 +3,14 @@ import random
 import string
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify, send_from_directory
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'supersecretkey123'
+app.config['SECRET_KEY'] = 'secret-key-2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
@@ -20,9 +20,10 @@ os.makedirs('uploads/audio', exist_ok=True)
 os.makedirs('uploads/avatars', exist_ok=True)
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Модели
+# ============ МОДЕЛИ ============
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -31,7 +32,10 @@ class User(db.Model):
     avatar = db.Column(db.String(200), default='')
     bio = db.Column(db.String(200), default='')
     status = db.Column(db.String(50), default='online')
+    role = db.Column(db.String(50), default='user')  # owner, admin, moderator, helper, user
+    theme = db.Column(db.String(20), default='dark')
     last_avatar_change = db.Column(db.DateTime, default=None)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -41,6 +45,22 @@ class Message(db.Model):
     file_url = db.Column(db.String(200))
     file_type = db.Column(db.String(20))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Friend(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    friend_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, blocked
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    from_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    type = db.Column(db.String(50))
+    content = db.Column(db.String(200))
+    read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 def generate_user_id():
     while True:
@@ -57,519 +77,34 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# Создание таблиц
+def role_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('login'))
+            user = User.query.get(session['user_id'])
+            if user.role not in roles:
+                return jsonify({'error': 'Нет прав'}), 403
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
 with app.app_context():
     db.create_all()
+    # Создаём владельца если нет
+    if not User.query.filter_by(role='owner').first():
+        owner = User(
+            username='MrAizex',
+            user_id_display=generate_user_id(),
+            password=generate_password_hash('admin123'),
+            role='owner'
+        )
+        db.session.add(owner)
+        db.session.commit()
+        print("✅ Владелец MrAizex создан! Пароль: admin123")
 
-# ==================== HTML ШАБЛОНЫ ====================
-
-LOGIN_HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>ChatVerse - Вход</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            width: 350px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        h2 { text-align: center; margin-bottom: 30px; color: #333; }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-        button:hover { opacity: 0.9; }
-        .error { color: red; text-align: center; margin-bottom: 15px; }
-        .footer { text-align: center; margin-top: 20px; }
-        .footer a { color: #667eea; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>💬 Вход в чат</h2>
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        <form method="post">
-            <input type="text" name="username" placeholder="Имя пользователя или ID" required>
-            <input type="password" name="password" placeholder="Пароль" required>
-            <button type="submit">Войти</button>
-        </form>
-        <div class="footer">
-            <a href="/register">Нет аккаунта? Зарегистрируйтесь</a>
-        </div>
-    </div>
-</body>
-</html>
-'''
-
-REGISTER_HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>ChatVerse - Регистрация</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            width: 400px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        h2 { text-align: center; margin-bottom: 30px; color: #333; }
-        input, textarea {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-family: Arial;
-        }
-        textarea { resize: vertical; min-height: 60px; }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-        .error { color: red; text-align: center; margin-bottom: 15px; }
-        .footer { text-align: center; margin-top: 20px; }
-        .footer a { color: #667eea; text-decoration: none; }
-        .info { background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; text-align: center; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>📝 Регистрация</h2>
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        <div class="info">Вы получите уникальный ID (4-8 символов) для входа</div>
-        <form method="post">
-            <input type="text" name="username" placeholder="Имя пользователя" required minlength="3">
-            <textarea name="bio" placeholder="О себе (необязательно)"></textarea>
-            <input type="password" name="password" placeholder="Пароль" required minlength="4">
-            <input type="password" name="confirm_password" placeholder="Подтвердите пароль" required>
-            <button type="submit">Зарегистрироваться</button>
-        </form>
-        <div class="footer">
-            <a href="/login">Уже есть аккаунт? Войдите</a>
-        </div>
-    </div>
-</body>
-</html>
-'''
-
-PROFILE_HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Профиль - ChatVerse</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            width: 500px;
-            max-width: 100%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        .avatar {
-            width: 100px;
-            height: 100px;
-            background: #667eea;
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 50px;
-            overflow: hidden;
-        }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        h2 { text-align: center; margin-bottom: 10px; }
-        .user-id { text-align: center; color: #666; margin-bottom: 30px; font-family: monospace; font-size: 18px; }
-        input, textarea {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-        }
-        textarea { resize: vertical; }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-        .back-btn {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-            color: #667eea;
-            text-decoration: none;
-        }
-        .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
-        .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
-        .warning { font-size: 12px; color: #e67e22; margin-top: 5px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="avatar">
-            {% if user.avatar %}
-                <img src="{{ user.avatar }}" alt="avatar">
-            {% else %}
-                👤
-            {% endif %}
-        </div>
-        <h2>{{ user.username }}</h2>
-        <div class="user-id">ID: {{ user.user_id_display }}</div>
-        
-        {% if success %}<div class="success">{{ success }}</div>{% endif %}
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        
-        <form method="post" enctype="multipart/form-data" action="/update_profile">
-            <input type="file" name="avatar" accept="image/*">
-            {% if not can_change_avatar %}
-                <div class="warning">⏰ Сменить аватар можно будет через {{ days_left }} дней</div>
-            {% endif %}
-            <textarea name="bio" placeholder="О себе">{{ user.bio }}</textarea>
-            <input type="password" name="new_password" placeholder="Новый пароль (оставьте пустым, если не хотите менять)">
-            <button type="submit">Сохранить</button>
-        </form>
-        <a href="/chat" class="back-btn">← Вернуться в чат</a>
-    </div>
-</body>
-</html>
-'''
-
-CHAT_HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Chat - {{ username }}</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #1a1a2e;
-            height: 100vh;
-            display: flex;
-        }
-        .sidebar {
-            width: 260px;
-            background: #16213e;
-            display: flex;
-            flex-direction: column;
-            color: white;
-        }
-        .user-info {
-            padding: 20px;
-            text-align: center;
-            background: #0f3460;
-            cursor: pointer;
-        }
-        .user-info .avatar {
-            width: 60px;
-            height: 60px;
-            background: #667eea;
-            border-radius: 50%;
-            margin: 0 auto 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-        }
-        .rooms, .users {
-            padding: 20px;
-            border-bottom: 1px solid #2a2a4a;
-        }
-        .room-item, .user-item {
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        .room-item:hover, .user-item:hover { background: #2a2a4a; }
-        .room-item.active { background: #667eea; }
-        .chat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #1a1a2e;
-        }
-        .chat-header {
-            padding: 20px;
-            background: #16213e;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #2a2a4a;
-        }
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-        .message {
-            margin-bottom: 15px;
-            animation: fadeIn 0.3s;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .message-header { margin-bottom: 5px; }
-        .username { font-weight: bold; color: #667eea; margin-right: 10px; }
-        .timestamp { font-size: 11px; color: #888; }
-        .message-content {
-            background: #0f3460;
-            padding: 10px 15px;
-            border-radius: 15px;
-            display: inline-block;
-            max-width: 70%;
-            color: white;
-        }
-        .message-image { max-width: 250px; border-radius: 10px; margin-top: 5px; }
-        .controls {
-            padding: 20px;
-            background: #16213e;
-            display: flex;
-            gap: 10px;
-        }
-        #messageInput {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 25px;
-            background: #0f3460;
-            color: white;
-        }
-        button {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-        }
-        button:hover { opacity: 0.9; }
-        .online-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .offline-dot { width: 8px; height: 8px; background: #666; border-radius: 50%; display: inline-block; margin-right: 8px; }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <div class="user-info" onclick="location.href='/profile'">
-            <div class="avatar">👤</div>
-            <strong>{{ username }}</strong>
-            <div style="font-size: 12px; opacity: 0.7;">ID: {{ user_id }}</div>
-        </div>
-        <div class="rooms">
-            <div style="margin-bottom: 10px;">📌 Комнаты</div>
-            <div class="room-item active" data-room="general"># Общий чат</div>
-            <div class="room-item" data-room="random">🎲 Случайный</div>
-            <div class="room-item" data-room="help">❓ Помощь</div>
-        </div>
-        <div class="users">
-            <div style="margin-bottom: 10px;">👥 Онлайн (<span id="onlineCount">0</span>)</div>
-            <div id="usersList"></div>
-        </div>
-    </div>
-    <div class="chat">
-        <div class="chat-header">
-            <h2><span id="currentRoomName">Общий чат</span></h2>
-            <button onclick="location.href='/logout'">Выйти</button>
-        </div>
-        <div class="messages" id="messages"></div>
-        <div class="controls">
-            <input type="text" id="messageInput" placeholder="Введите сообщение...">
-            <input type="file" id="imageInput" accept="image/*" style="display:none">
-            <button id="imageBtn">📷</button>
-            <button id="sendBtn">📤 Отправить</button>
-        </div>
-    </div>
-
-    <script>
-        const socket = io();
-        let currentRoom = 'general';
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        function addMessage(msg) {
-            const div = document.createElement('div');
-            div.className = 'message';
-            div.innerHTML = `
-                <div class="message-header">
-                    <span class="username">${escapeHtml(msg.username)}</span>
-                    <span class="timestamp">${msg.timestamp}</span>
-                </div>
-                <div class="message-content">
-                    ${msg.text ? `<p>${escapeHtml(msg.text)}</p>` : ''}
-                    ${msg.file_type === 'image' ? `<img class="message-image" src="${msg.file_url}">` : ''}
-                </div>
-            `;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-        }
-        
-        // Загрузка сообщений
-        function loadMessages(room) {
-            fetch(`/get_messages?room=${room}`)
-                .then(res => res.json())
-                .then(messages => {
-                    const container = document.getElementById('messages');
-                    container.innerHTML = '';
-                    messages.forEach(msg => addMessage(msg));
-                });
-        }
-        
-        // Обновление списка пользователей
-        function loadUsers() {
-            fetch('/get_users')
-                .then(res => res.json())
-                .then(users => {
-                    const container = document.getElementById('usersList');
-                    const onlineCount = users.filter(u => u.status === 'online').length;
-                    document.getElementById('onlineCount').innerText = onlineCount;
-                    container.innerHTML = '';
-                    users.forEach(user => {
-                        if (user.id != {{ session['user_id'] }}) {
-                            container.innerHTML += `
-                                <div class="user-item">
-                                    <span class="${user.status === 'online' ? 'online-dot' : 'offline-dot'}"></span>
-                                    ${escapeHtml(user.username)}
-                                </div>
-                            `;
-                        }
-                    });
-                });
-        }
-        
-        // Socket events
-        socket.on('new_message', (msg) => {
-            if (msg.room === currentRoom) addMessage(msg);
-        });
-        
-        socket.on('user_online', () => loadUsers());
-        socket.on('user_offline', () => loadUsers());
-        
-        // Отправка сообщения
-        document.getElementById('sendBtn').onclick = () => {
-            const input = document.getElementById('messageInput');
-            const text = input.value.trim();
-            if (text) {
-                socket.emit('message', { text, room: currentRoom });
-                input.value = '';
-            }
-        };
-        
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') document.getElementById('sendBtn').click();
-        });
-        
-        // Загрузка изображения
-        document.getElementById('imageBtn').onclick = () => document.getElementById('imageInput').click();
-        document.getElementById('imageInput').onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const formData = new FormData();
-            formData.append('file', file);
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.file_url) {
-                socket.emit('message', { file_url: data.file_url, file_type: 'image', room: currentRoom });
-            }
-            document.getElementById('imageInput').value = '';
-        };
-        
-        // Смена комнаты
-        document.querySelectorAll('.room-item').forEach(room => {
-            room.onclick = () => {
-                document.querySelectorAll('.room-item').forEach(r => r.classList.remove('active'));
-                room.classList.add('active');
-                currentRoom = room.getAttribute('data-room');
-                document.getElementById('currentRoomName').innerText = room.innerText.trim();
-                loadMessages(currentRoom);
-                socket.emit('join', { room: currentRoom });
-            };
-        });
-        
-        loadMessages('general');
-        loadUsers();
-        setInterval(loadUsers, 5000);
-    </script>
-</body>
-</html>
-'''
-
-# ==================== МАРШРУТЫ ====================
+# ============ МАРШРУТЫ ============
 
 @app.route('/')
 def index():
@@ -582,20 +117,18 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
         user = User.query.filter(
             (User.username == username) | (User.user_id_display == username)
         ).first()
-        
         if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             session['username'] = user.username
-            session['user_id_display'] = user.user_id_display
+            session['role'] = user.role
             user.status = 'online'
             db.session.commit()
             return redirect(url_for('chat'))
-        return render_template_string(LOGIN_HTML, error='Неверный логин/ID или пароль')
-    return render_template_string(LOGIN_HTML)
+        return render_template('login.html', error='Неверный логин или пароль')
+    return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -606,19 +139,17 @@ def register():
         bio = request.form.get('bio', '')
         
         if password != confirm:
-            return render_template_string(REGISTER_HTML, error='Пароли не совпадают')
+            return render_template('register.html', error='Пароли не совпадают')
         if len(username) < 3:
-            return render_template_string(REGISTER_HTML, error='Имя слишком короткое')
+            return render_template('register.html', error='Имя слишком короткое')
         if User.query.filter_by(username=username).first():
-            return render_template_string(REGISTER_HTML, error='Пользователь уже существует')
+            return render_template('register.html', error='Пользователь уже существует')
         
         user_id = generate_user_id()
-        hashed = generate_password_hash(password)
-        
         user = User(
             username=username,
             user_id_display=user_id,
-            password=hashed,
+            password=generate_password_hash(password),
             bio=bio
         )
         db.session.add(user)
@@ -626,20 +157,16 @@ def register():
         
         session['user_id'] = user.id
         session['username'] = user.username
-        session['user_id_display'] = user.user_id_display
-        
+        session['role'] = user.role
         return redirect(url_for('chat'))
     
-    return render_template_string(REGISTER_HTML)
+    return render_template('register.html')
 
 @app.route('/chat')
 @login_required
 def chat():
     user = User.query.get(session['user_id'])
-    return render_template_string(CHAT_HTML, 
-                                  username=user.username,
-                                  user_id=user.user_id_display,
-                                  session=session)
+    return render_template('chat.html', user=user)
 
 @app.route('/profile')
 @login_required
@@ -648,82 +175,199 @@ def profile():
     can_change = True
     days_left = 0
     if user.last_avatar_change:
-        week_ago = datetime.utcnow() - timedelta(days=7)
-        if user.last_avatar_change > week_ago:
+        if datetime.utcnow() - user.last_avatar_change < timedelta(days=7):
             can_change = False
             days_left = 7 - (datetime.utcnow() - user.last_avatar_change).days
-    return render_template_string(PROFILE_HTML, user=user, can_change_avatar=can_change, days_left=days_left)
+    return render_template('profile.html', user=user, can_change_avatar=can_change, days_left=days_left)
+
+@app.route('/user/<int:user_id>')
+@login_required
+def user_profile(user_id):
+    user = User.query.get_or_404(user_id)
+    current_user = User.query.get(session['user_id'])
+    is_friend = Friend.query.filter(
+        ((Friend.user_id == session['user_id']) & (Friend.friend_id == user_id)) |
+        ((Friend.user_id == user_id) & (Friend.friend_id == session['user_id']))
+    ).first()
+    return render_template('user_profile.html', user=user, current_user=current_user, is_friend=is_friend)
 
 @app.route('/update_profile', methods=['POST'])
 @login_required
 def update_profile():
     user = User.query.get(session['user_id'])
-    success = None
-    error = None
     
     if 'avatar' in request.files:
         file = request.files['avatar']
         if file and file.filename:
-            can_change = True
-            if user.last_avatar_change:
-                week_ago = datetime.utcnow() - timedelta(days=7)
-                if user.last_avatar_change > week_ago:
-                    can_change = False
-                    error = 'Аватар можно менять раз в неделю!'
+            if user.last_avatar_change and datetime.utcnow() - user.last_avatar_change < timedelta(days=7):
+                return render_template('profile.html', user=user, error='Аватар можно менять раз в неделю!')
             
-            if can_change:
-                filename = f"{user.id}_{datetime.utcnow().timestamp()}_{secure_filename(file.filename)}"
-                path = os.path.join('uploads/avatars', filename)
-                file.save(path)
-                user.avatar = f'/uploads/avatars/{filename}'
-                user.last_avatar_change = datetime.utcnow()
-                success = 'Аватар обновлён!'
+            filename = f"{user.id}_{datetime.utcnow().timestamp()}_{secure_filename(file.filename)}"
+            path = os.path.join('uploads/avatars', filename)
+            file.save(path)
+            user.avatar = f'/uploads/avatars/{filename}'
+            user.last_avatar_change = datetime.utcnow()
     
     if 'bio' in request.form:
         user.bio = request.form['bio']
-        success = success or 'Профиль обновлён!'
+    
+    if 'theme' in request.form:
+        user.theme = request.form['theme']
     
     if 'new_password' in request.form and request.form['new_password']:
         user.password = generate_password_hash(request.form['new_password'])
-        success = success or 'Пароль изменён!'
     
     db.session.commit()
+    return render_template('profile.html', user=user, success='Профиль обновлён!')
+
+@app.route('/change_role', methods=['POST'])
+@login_required
+def change_role():
+    current_user = User.query.get(session['user_id'])
+    if current_user.role not in ['owner', 'admin']:
+        return jsonify({'error': 'Нет прав'}), 403
     
-    can_change = True
-    days_left = 0
-    if user.last_avatar_change:
-        week_ago = datetime.utcnow() - timedelta(days=7)
-        if user.last_avatar_change > week_ago:
-            can_change = False
-            days_left = 7 - (datetime.utcnow() - user.last_avatar_change).days
+    data = request.get_json()
+    target_user = User.query.get(data['user_id'])
+    if not target_user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
     
-    return render_template_string(PROFILE_HTML, user=user, success=success, error=error, can_change_avatar=can_change, days_left=days_left)
+    if current_user.role == 'owner' and target_user.role != 'owner':
+        target_user.role = data['role']
+        db.session.commit()
+        return jsonify({'success': True, 'new_role': target_user.role})
+    elif current_user.role == 'admin' and target_user.role in ['user', 'helper', 'moderator']:
+        target_user.role = data['role']
+        db.session.commit()
+        return jsonify({'success': True, 'new_role': target_user.role})
+    
+    return jsonify({'error': 'Недостаточно прав'}), 403
+
+@app.route('/friend_request', methods=['POST'])
+@login_required
+def friend_request():
+    data = request.get_json()
+    friend = User.query.filter_by(user_id_display=data['user_id']).first()
+    if not friend:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    
+    existing = Friend.query.filter(
+        ((Friend.user_id == session['user_id']) & (Friend.friend_id == friend.id)) |
+        ((Friend.user_id == friend.id) & (Friend.friend_id == session['user_id']))
+    ).first()
+    
+    if existing:
+        return jsonify({'error': 'Запрос уже отправлен'}), 400
+    
+    friend_req = Friend(user_id=session['user_id'], friend_id=friend.id, status='pending')
+    db.session.add(friend_req)
+    
+    notif = Notification(
+        user_id=friend.id,
+        from_user_id=session['user_id'],
+        type='friend_request',
+        content=f"{session['username']} хочет добавить вас в друзья"
+    )
+    db.session.add(notif)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/accept_friend', methods=['POST'])
+@login_required
+def accept_friend():
+    data = request.get_json()
+    friend_req = Friend.query.filter_by(id=data['request_id'], friend_id=session['user_id']).first()
+    if friend_req:
+        friend_req.status = 'accepted'
+        db.session.commit()
+        return jsonify({'success': True})
+    return jsonify({'error': 'Запрос не найден'}), 404
+
+@app.route('/get_notifications')
+@login_required
+def get_notifications():
+    notifs = Notification.query.filter_by(user_id=session['user_id'], read=False).order_by(Notification.created_at.desc()).limit(20).all()
+    return jsonify([{
+        'id': n.id,
+        'content': n.content,
+        'type': n.type,
+        'from_user': User.query.get(n.from_user_id).username if n.from_user_id else None,
+        'created_at': n.created_at.strftime('%H:%M')
+    } for n in notifs])
+
+@app.route('/mark_notification_read', methods=['POST'])
+@login_required
+def mark_notification_read():
+    data = request.get_json()
+    notif = Notification.query.get(data['notification_id'])
+    if notif and notif.user_id == session['user_id']:
+        notif.read = True
+        db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/get_messages')
 @login_required
 def get_messages():
     room = request.args.get('room', 'general')
-    msgs = Message.query.filter_by(room=room).order_by(Message.timestamp).limit(100).all()
+    messages = Message.query.filter_by(room=room).order_by(Message.timestamp).limit(100).all()
     return jsonify([{
         'id': m.id,
         'username': User.query.get(m.user_id).username,
+        'user_role': User.query.get(m.user_id).role,
+        'user_id': m.user_id,
         'text': m.content,
         'file_url': m.file_url,
         'file_type': m.file_type,
         'timestamp': m.timestamp.strftime('%H:%M'),
-        'room': m.room
-    } for m in msgs])
+        'avatar': User.query.get(m.user_id).avatar
+    } for m in messages])
 
 @app.route('/get_users')
 @login_required
 def get_users():
     users = User.query.all()
+    current_user_id = session['user_id']
     return jsonify([{
         'id': u.id,
         'username': u.username,
         'user_id_display': u.user_id_display,
-        'status': u.status
-    } for u in users])
+        'status': u.status,
+        'role': u.role,
+        'avatar': u.avatar
+    } for u in users if u.id != current_user_id])
+
+@app.route('/get_friends')
+@login_required
+def get_friends():
+    friends = Friend.query.filter(
+        ((Friend.user_id == session['user_id']) | (Friend.friend_id == session['user_id'])),
+        Friend.status == 'accepted'
+    ).all()
+    result = []
+    for f in friends:
+        friend_id = f.friend_id if f.user_id == session['user_id'] else f.user_id
+        friend = User.query.get(friend_id)
+        if friend:
+            result.append({
+                'id': friend.id,
+                'username': friend.username,
+                'user_id_display': friend.user_id_display,
+                'status': friend.status,
+                'avatar': friend.avatar
+            })
+    return jsonify(result)
+
+@app.route('/get_friend_requests')
+@login_required
+def get_friend_requests():
+    requests = Friend.query.filter_by(friend_id=session['user_id'], status='pending').all()
+    return jsonify([{
+        'id': r.id,
+        'from_user': User.query.get(r.user_id).username,
+        'from_user_id': r.user_id,
+        'created_at': r.created_at.strftime('%H:%M')
+    } for r in requests])
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -755,7 +399,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# ==================== SOCKET.IO ====================
+# ============ SOCKET.IO ============
 
 @socketio.on('connect')
 def handle_connect():
@@ -764,7 +408,7 @@ def handle_connect():
         if user:
             user.status = 'online'
             db.session.commit()
-            emit('user_online', {'user_id': user.id}, broadcast=True)
+            emit('user_online', {'user_id': user.id, 'username': user.username}, broadcast=True)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -798,12 +442,22 @@ def handle_message(data):
     emit('new_message', {
         'id': msg.id,
         'username': user.username,
+        'user_role': user.role,
+        'user_id': user.id,
         'text': text,
         'file_url': file_url,
         'file_type': file_type,
         'timestamp': msg.timestamp.strftime('%H:%M'),
-        'room': room
+        'avatar': user.avatar
     }, room=room, broadcast=True)
+
+@socketio.on('typing')
+def handle_typing(data):
+    if 'user_id' in session:
+        emit('user_typing', {
+            'username': session['username'],
+            'is_typing': data.get('is_typing', False)
+        }, room=data.get('room', 'general'), include_self=False)
 
 @socketio.on('join')
 def handle_join(data):
@@ -811,4 +465,4 @@ def handle_join(data):
     join_room(room)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

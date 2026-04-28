@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template_string, request, redirect, url_for, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -60,9 +60,315 @@ class Message(db.Model):
             'timestamp': self.timestamp.strftime('%H:%M')
         }
 
-# Создаём таблицы (это должно быть ПОСЛЕ определения моделей)
+# Создаём таблицы
 with app.app_context():
     db.create_all()
+
+# HTML шаблон для страницы входа (с красивым дизайном)
+LOGIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в чат</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            width: 400px;
+            max-width: 90%;
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .form-container {
+            padding: 40px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Мессенджер</h1>
+            <p>Войдите в свой аккаунт</p>
+        </div>
+        <div class="form-container">
+            {% if error %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+            <form method="post">
+                <div class="form-group">
+                    <label>👤 Имя пользователя</label>
+                    <input type="text" name="username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label>🔒 Пароль</label>
+                    <input type="password" name="password" required>
+                </div>
+                <button type="submit">Войти</button>
+            </form>
+            <div class="footer">
+                Нет аккаунта? <a href="/register">Зарегистрироваться</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+# HTML шаблон для страницы регистрации
+REGISTER_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация в чате</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            width: 400px;
+            max-width: 90%;
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .form-container {
+            padding: 40px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 Регистрация</h1>
+            <p>Создайте новый аккаунт</p>
+        </div>
+        <div class="form-container">
+            {% if error %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+            <form method="post">
+                <div class="form-group">
+                    <label>👤 Имя пользователя</label>
+                    <input type="text" name="username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label>🔒 Пароль</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>🔒 Подтверждение пароля</label>
+                    <input type="password" name="confirm_password" required>
+                </div>
+                <button type="submit">Зарегистрироваться</button>
+            </form>
+            <div class="footer">
+                Уже есть аккаунт? <a href="/login">Войти</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+'''
 
 # Маршруты
 @app.route('/')
@@ -81,34 +387,29 @@ def login():
             session['user_id'] = user.id
             session['username'] = user.username
             return redirect(url_for('chat'))
-        return 'Invalid credentials', 401
-    return '''
-        <form method="post">
-            <input type="text" name="username" placeholder="Username">
-            <input type="password" name="password" placeholder="Password">
-            <button type="submit">Login</button>
-        </form>
-        <a href="/register">Register</a>
-    '''
+        return render_template_string(LOGIN_TEMPLATE, error='Неверное имя пользователя или пароль')
+    return render_template_string(LOGIN_TEMPLATE)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        password = generate_password_hash(request.form['password'])
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+        
+        if password != confirm_password:
+            return render_template_string(REGISTER_TEMPLATE, error='Пароли не совпадают')
+        
         if User.query.filter_by(username=username).first():
-            return 'User exists', 400
-        user = User(username=username, password=password)
+            return render_template_string(REGISTER_TEMPLATE, error='Пользователь уже существует')
+        
+        hashed_password = generate_password_hash(password)
+        user = User(username=username, password=hashed_password)
         db.session.add(user)
         db.session.commit()
         return redirect(url_for('login'))
-    return '''
-        <form method="post">
-            <input type="text" name="username" placeholder="Username">
-            <input type="password" name="password" placeholder="Password">
-            <button type="submit">Register</button>
-        </form>
-    '''
+    
+    return render_template_string(REGISTER_TEMPLATE)
 
 @app.route('/chat')
 def chat():
@@ -168,48 +469,209 @@ def handle_message(data):
         'timestamp': msg.timestamp.strftime('%H:%M')
     }, room=room, broadcast=True)
 
-# HTML шаблон
+# HTML шаблон для самого чата
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat with Media</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чат - {{ username }}</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { font-family: Arial; max-width: 800px; margin: auto; padding: 20px; }
-        #messages { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
-        .message { margin: 5px 0; }
-        .username { font-weight: bold; color: #2c3e50; }
-        .timestamp { font-size: 0.7em; color: gray; margin-left: 10px; }
-        img { max-width: 200px; max-height: 200px; margin-top: 5px; }
-        audio { margin-top: 5px; }
-        #controls button { margin: 5px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .chat-container {
+            width: 90%;
+            max-width: 1000px;
+            height: 85vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-header h2 {
+            font-size: 20px;
+        }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message-header {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 5px;
+        }
+        .username {
+            font-weight: bold;
+            color: #667eea;
+            margin-right: 10px;
+        }
+        .timestamp {
+            font-size: 0.7em;
+            color: #999;
+        }
+        .message-content {
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            display: inline-block;
+            max-width: 70%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .message-text {
+            margin: 0;
+            word-wrap: break-word;
+        }
+        .message-image {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            margin-top: 5px;
+        }
+        .message-audio {
+            margin-top: 5px;
+        }
+        .controls-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #messageInput {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        #messageInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            padding: 12px 20px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        @media (max-width: 768px) {
+            .message-content {
+                max-width: 90%;
+            }
+            .controls-area {
+                flex-wrap: wrap;
+            }
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h2>Chat: {{ username }}</h2>
-    <button onclick="window.location.href='/logout'">Logout</button>
-    <div id="messages">
-        {% for msg in messages %}
-            <div class="message">
-                <span class="username">{{ msg.user.username }}:</span>
-                {% if msg.content %}<span>{{ msg.content }}</span>{% endif %}
-                {% if msg.file_type == 'image' %}
-                    <br><img src="{{ msg.file_url }}">
-                {% elif msg.file_type == 'audio' %}
-                    <br><audio controls src="{{ msg.file_url }}"></audio>
-                {% endif %}
-                <span class="timestamp">{{ msg.timestamp }}</span>
-            </div>
-        {% endfor %}
-    </div>
-    <div id="controls">
-        <input type="text" id="messageInput" placeholder="Type message..." style="width: 60%;">
-        <button id="sendBtn">Send</button>
-        <input type="file" id="imageInput" accept="image/*" style="display: none;">
-        <button id="uploadImageBtn">📷 Image</button>
-        <button id="recordBtn">🎤 Record</button>
-        <button id="stopRecordBtn" disabled>Stop</button>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>💬 Общий чат</h2>
+            <button class="logout-btn" onclick="window.location.href='/logout'">🚪 Выйти</button>
+        </div>
+        <div class="messages-area" id="messages">
+            {% for msg in messages %}
+                <div class="message">
+                    <div class="message-header">
+                        <span class="username">{{ msg.user.username }}:</span>
+                        <span class="timestamp">{{ msg.timestamp.strftime('%H:%M') }}</span>
+                    </div>
+                    <div class="message-content">
+                        {% if msg.content %}
+                            <p class="message-text">{{ msg.content }}</p>
+                        {% endif %}
+                        {% if msg.file_type == 'image' %}
+                            <img class="message-image" src="{{ msg.file_url }}" alt="image">
+                        {% elif msg.file_type == 'audio' %}
+                            <audio class="message-audio" controls src="{{ msg.file_url }}"></audio>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="controls-area">
+            <input type="text" id="messageInput" placeholder="Введите сообщение..." autofocus>
+            <button class="btn btn-primary" id="sendBtn">Отправить</button>
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            <button class="btn" id="uploadImageBtn">📷 Изображение</button>
+            <button class="btn" id="recordBtn">🎤 Запись</button>
+            <button class="btn" id="stopRecordBtn" disabled>⏹️ Стоп</button>
+        </div>
     </div>
 
     <script>
@@ -227,14 +689,26 @@ HTML_TEMPLATE = '''
         socket.on('new_message', (msg) => {
             const div = document.createElement('div');
             div.className = 'message';
-            div.innerHTML = `<span class="username">${msg.username}:</span>
-                             ${msg.text ? `<span>${msg.text}</span>` : ''}
-                             ${msg.file_type === 'image' ? `<br><img src="${msg.file_url}">` : ''}
-                             ${msg.file_type === 'audio' ? `<br><audio controls src="${msg.file_url}"></audio>` : ''}
-                             <span class="timestamp">${msg.timestamp}</span>`;
+            div.innerHTML = `
+                <div class="message-header">
+                    <span class="username">${escapeHtml(msg.username)}:</span>
+                    <span class="timestamp">${msg.timestamp}</span>
+                </div>
+                <div class="message-content">
+                    ${msg.text ? `<p class="message-text">${escapeHtml(msg.text)}</p>` : ''}
+                    ${msg.file_type === 'image' ? `<img class="message-image" src="${msg.file_url}">` : ''}
+                    ${msg.file_type === 'audio' ? `<audio class="message-audio" controls src="${msg.file_url}"></audio>` : ''}
+                </div>
+            `;
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
         sendBtn.onclick = () => {
             const text = messageInput.value.trim();
@@ -288,12 +762,12 @@ HTML_TEMPLATE = '''
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendBtn.click();
         });
+
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     </script>
 </body>
 </html>
 '''
-
-from flask import render_template_string
 
 # Это для локального запуска (Render использует Gunicorn, поэтому этот блок не обязателен)
 if __name__ == '__main__':

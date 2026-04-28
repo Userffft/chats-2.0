@@ -4,63 +4,30 @@
     <meta charset="UTF-8">
     <title>ChatVerse - Вход</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            width: 350px;
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        h2 { text-align: center; margin-bottom: 30px; color: #333; }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            transition: 0.2s;
-        }
-        input:focus { outline: none; border-color: #667eea; }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: 0.2s;
-        }
-        button:hover { transform: translateY(-2px); }
-        .error { color: red; text-align: center; margin-bottom: 15px; }
-        .footer { text-align: center; margin-top: 20px; }
-        .footer a { color: #667eea; text-decoration: none; }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;justify-content:center;align-items:center}
+        .container{background:white;padding:40px;border-radius:20px;width:350px;animation:fadeIn 0.3s}
+        @keyframes fadeIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
+        h2{text-align:center;margin-bottom:30px;color:#333}
+        input{width:100%;padding:12px;margin:10px 0;border:2px solid #e0e0e0;border-radius:10px}
+        input:focus{outline:none;border-color:#667eea}
+        button{width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:10px;cursor:pointer;font-size:16px}
+        button:hover{transform:translateY(-2px)}
+        .error{color:red;text-align:center;margin-bottom:15px}
+        .footer{text-align:center;margin-top:20px}
+        .footer a{color:#667eea;text-decoration:none}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>💬 ChatVerse</h2>
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        <form method="post">
-            <input type="text" name="username" placeholder="Имя или ID" required autofocus>
-            <input type="password" name="password" placeholder="Пароль" required>
-            <button type="submit">Войти</button>
-        </form>
-        <div class="footer"><a href="/register">Регистрация</a></div>
-    </div>
+<div class="container">
+    <h2>💬 ChatVerse</h2>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post">
+        <input type="text" name="username" placeholder="Имя или ID" required autofocus>
+        <input type="password" name="password" placeholder="Пароль" required>
+        <button type="submit">Войти</button>
+    </form>
+    <div class="footer"><a href="/register">Регистрация</a></div>
+</div>
 </body>
 </html>

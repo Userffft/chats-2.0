@@ -70,7 +70,13 @@ def login_required(f):
 # Создание таблиц
 with app.app_context():
     db.create_all()
-
+    # Добавляем колонку theme если её нет
+    try:
+        from sqlalchemy import text
+        db.session.execute(text('ALTER TABLE user ADD COLUMN theme VARCHAR(20) DEFAULT "dark"'))
+        db.session.commit()
+    except Exception as e:
+        print("Колонка theme уже существует или ошибка:", e)
 # ============ HTML ШАБЛОНЫ ============
 
 LOGIN_TEMPLATE = '''

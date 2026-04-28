@@ -1,123 +1,66 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Мой профиль - ChatVerse</title>
+    <title>Редактирование профиля - ChatVerse</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px;
-            text-align: center;
-            color: white;
-        }
-        .avatar {
-            width: 100px;
-            height: 100px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            margin: 0 auto 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 50px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .avatar:hover { transform: scale(1.05); }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .form-container { padding: 30px; }
-        input, textarea, select {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-family: inherit;
-        }
-        textarea { resize: vertical; min-height: 80px; }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: 0.2s;
-        }
-        button:hover { transform: translateY(-2px); }
-        .back-btn {
-            display: block;
-            text-align: center;
-            margin-top: 15px;
-            color: #667eea;
-            text-decoration: none;
-        }
-        .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
-        .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
-        .warning { font-size: 12px; color: #e67e22; margin-top: 5px; }
-        .user-id { font-family: monospace; font-size: 16px; }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}
+        .container{max-width:500px;margin:0 auto;background:white;border-radius:28px;overflow:hidden;animation:fadeIn 0.3s}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+        .header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;text-align:center;color:white}
+        .avatar{width:110px;height:110px;background:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 15px;display:flex;align-items:center;justify-content:center;font-size:50px;overflow:hidden;cursor:pointer}
+        .avatar img{width:100%;height:100%;object-fit:cover}
+        .form-container{padding:30px}
+        input,textarea,select{width:100%;padding:12px;margin:10px 0;border:2px solid #e0e0e0;border-radius:14px;font-family:inherit}
+        textarea{resize:vertical;min-height:80px}
+        button{width:100%;padding:14px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:14px;cursor:pointer;font-size:16px;font-weight:bold}
+        button:hover{transform:translateY(-2px)}
+        .back-btn{display:block;text-align:center;margin-top:20px;color:#667eea;text-decoration:none;font-weight:bold}
+        .success{background:#d4edda;color:#155724;padding:12px;border-radius:14px;margin-bottom:20px;text-align:center}
+        .error{background:#f8d7da;color:#721c24;padding:12px;border-radius:14px;margin-bottom:20px;text-align:center}
+        .warning{font-size:12px;color:#e67e22;margin-top:5px}
+        .user-id{font-family:monospace;font-size:18px}
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="avatar" onclick="document.getElementById('avatarInput').click()">
-                {% if user.avatar %}
-                    <img src="{{ user.avatar }}" alt="avatar">
-                {% else %}
-                    👤
-                {% endif %}
-            </div>
-            <h2>{{ user.username }}</h2>
-            <div class="user-id">ID: {{ user.user_id_display }}</div>
-            <div>Роль: 
-                {% if user.role == 'owner' %}👑 Владелец
-                {% elif user.role == 'admin' %}⚙️ Админ
-                {% elif user.role == 'moderator' %}🛡️ Модератор
-                {% elif user.role == 'helper' %}🆘 Хелпер
-                {% else %}👤 Пользователь{% endif %}
-            </div>
+<div class="container">
+    <div class="header">
+        <div class="avatar" onclick="document.getElementById('avatarInput').click()">
+            {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}
         </div>
-        <div class="form-container">
-            {% if success %}<div class="success">{{ success }}</div>{% endif %}
-            {% if error %}<div class="error">{{ error }}</div>{% endif %}
-            <form method="post" enctype="multipart/form-data" action="/update_profile">
-                <input type="file" id="avatarInput" name="avatar" accept="image/*" style="display:none" onchange="this.form.submit()">
-                <textarea name="bio" placeholder="О себе">{{ user.bio }}</textarea>
-                <select name="theme">
-                    <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 Тёмная</option>
-                    <option value="light" {% if user.theme == 'light' %}selected{% endif %}>☀️ Светлая</option>
-                    <option value="purple" {% if user.theme == 'purple' %}selected{% endif %}>💜 Фиолетовая</option>
-                    <option value="blue" {% if user.theme == 'blue' %}selected{% endif %}>💙 Синяя</option>
-                </select>
-                <input type="password" name="new_password" placeholder="Новый пароль (оставьте пустым)">
-                <button type="submit">Сохранить</button>
-            </form>
-            <a href="/chat" class="back-btn">← Вернуться в чат</a>
+        <h2>{{ user.username }}</h2>
+        <div class="user-id">ID: {{ user.user_id_display }}</div>
+        <div style="margin-top: 8px;">
+            {% if user.role == 'owner' %}👑 Владелец
+            {% elif user.role == 'admin' %}⚙️ Администратор
+            {% elif user.role == 'moderator' %}🛡️ Модератор
+            {% elif user.role == 'helper' %}🆘 Хелпер
+            {% else %}👤 Пользователь{% endif %}
         </div>
     </div>
+    <div class="form-container">
+        {% if success %}<div class="success">{{ success }}</div>{% endif %}
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form id="profileForm" enctype="multipart/form-data">
+            <input type="file" id="avatarInput" name="avatar" accept="image/*" style="display:none">
+            <textarea name="bio" placeholder="О себе">{{ user.bio }}</textarea>
+            <input type="password" name="new_password" placeholder="Новый пароль (оставьте пустым)">
+            <button type="submit">💾 Сохранить изменения</button>
+        </form>
+        <a href="/chat" class="back-btn">← Вернуться в чат</a>
+    </div>
+</div>
+<script>
+    document.getElementById('profileForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/update_profile', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.error || 'Ошибка');
+    };
+    document.getElementById('avatarInput').onchange = () => document.getElementById('profileForm').submit();
+</script>
 </body>
 </html>

@@ -20,7 +20,7 @@ os.makedirs('uploads/audio', exist_ok=True)
 os.makedirs('uploads/avatars', exist_ok=True)
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ============ МОДЕЛИ ============
 
@@ -32,7 +32,7 @@ class User(db.Model):
     avatar = db.Column(db.String(200), default='')
     bio = db.Column(db.String(200), default='')
     status = db.Column(db.String(50), default='online')
-    role = db.Column(db.String(50), default='user')  # owner, admin, moderator, helper, user
+    role = db.Column(db.String(50), default='user')
     theme = db.Column(db.String(20), default='dark')
     last_avatar_change = db.Column(db.DateTime, default=None)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -50,7 +50,7 @@ class Friend(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     friend_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    status = db.Column(db.String(20), default='pending')  # pending, accepted, blocked
+    status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Notification(db.Model):
@@ -59,6 +59,7 @@ class Notification(db.Model):
     from_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     type = db.Column(db.String(50))
     content = db.Column(db.String(200))
+    data = db.Column(db.String(500))
     read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -77,23 +78,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def role_required(roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            if 'user_id' not in session:
-                return redirect(url_for('login'))
-            user = User.query.get(session['user_id'])
-            if user.role not in roles:
-                return jsonify({'error': 'Нет прав'}), 403
-            return f(*args, **kwargs)
-        return decorated
-    return decorator
-
 with app.app_context():
     db.create_all()
-    # Создаём владельца если нет
-    if not User.query.filter_by(role='owner').first():
+    if not User.query.filter_by(username='MrAizex').first():
         owner = User(
             username='MrAizex',
             user_id_display=generate_user_id(),
@@ -168,28 +155,20 @@ def chat():
     user = User.query.get(session['user_id'])
     return render_template('chat.html', user=user)
 
-@app.route('/profile')
+@app.route('/get_user/<int:user_id>')
 @login_required
-def profile():
-    user = User.query.get(session['user_id'])
-    can_change = True
-    days_left = 0
-    if user.last_avatar_change:
-        if datetime.utcnow() - user.last_avatar_change < timedelta(days=7):
-            can_change = False
-            days_left = 7 - (datetime.utcnow() - user.last_avatar_change).days
-    return render_template('profile.html', user=user, can_change_avatar=can_change, days_left=days_left)
-
-@app.route('/user/<int:user_id>')
-@login_required
-def user_profile(user_id):
+def get_user(user_id):
     user = User.query.get_or_404(user_id)
-    current_user = User.query.get(session['user_id'])
-    is_friend = Friend.query.filter(
-        ((Friend.user_id == session['user_id']) & (Friend.friend_id == user_id)) |
-        ((Friend.user_id == user_id) & (Friend.friend_id == session['user_id']))
-    ).first()
-    return render_template('user_profile.html', user=user, current_user=current_user, is_friend=is_friend)
+    return jsonify({
+        'id': user.id,
+        'username': user.username,
+        'user_id_display': user.user_id_display,
+        'bio': user.bio or '',
+        'avatar': user.avatar,
+        'role': user.role,
+        'status': user.status,
+        'created_at': user.created_at.strftime('%d.%m.%Y')
+    })
 
 @app.route('/update_profile', methods=['POST'])
 @login_required
@@ -200,7 +179,7 @@ def update_profile():
         file = request.files['avatar']
         if file and file.filename:
             if user.last_avatar_change and datetime.utcnow() - user.last_avatar_change < timedelta(days=7):
-                return render_template('profile.html', user=user, error='Аватар можно менять раз в неделю!')
+                return jsonify({'error': 'Аватар можно менять раз в неделю!'}), 400
             
             filename = f"{user.id}_{datetime.utcnow().timestamp()}_{secure_filename(file.filename)}"
             path = os.path.join('uploads/avatars', filename)
@@ -218,7 +197,7 @@ def update_profile():
         user.password = generate_password_hash(request.form['new_password'])
     
     db.session.commit()
-    return render_template('profile.html', user=user, success='Профиль обновлён!')
+    return jsonify({'success': True})
 
 @app.route('/change_role', methods=['POST'])
 @login_required
@@ -247,7 +226,7 @@ def change_role():
 @login_required
 def friend_request():
     data = request.get_json()
-    friend = User.query.filter_by(user_id_display=data['user_id']).first()
+    friend = User.query.get(data['user_id'])
     if not friend:
         return jsonify({'error': 'Пользователь не найден'}), 404
     
@@ -257,7 +236,10 @@ def friend_request():
     ).first()
     
     if existing:
-        return jsonify({'error': 'Запрос уже отправлен'}), 400
+        if existing.status == 'pending':
+            return jsonify({'error': 'Запрос уже отправлен'}), 400
+        elif existing.status == 'accepted':
+            return jsonify({'error': 'Уже в друзьях'}), 400
     
     friend_req = Friend(user_id=session['user_id'], friend_id=friend.id, status='pending')
     db.session.add(friend_req)
@@ -266,10 +248,16 @@ def friend_request():
         user_id=friend.id,
         from_user_id=session['user_id'],
         type='friend_request',
-        content=f"{session['username']} хочет добавить вас в друзья"
+        content=f"{session['username']} хочет добавить вас в друзья",
+        data=str({'request_id': friend_req.id})
     )
     db.session.add(notif)
     db.session.commit()
+    
+    socketio.emit('new_notification', {
+        'user_id': friend.id,
+        'content': f"{session['username']} хочет добавить вас в друзья"
+    })
     
     return jsonify({'success': True})
 
@@ -281,20 +269,50 @@ def accept_friend():
     if friend_req:
         friend_req.status = 'accepted'
         db.session.commit()
+        
+        notif = Notification(
+            user_id=friend_req.user_id,
+            from_user_id=session['user_id'],
+            type='friend_accepted',
+            content=f"{session['username']} принял запрос в друзья"
+        )
+        db.session.add(notif)
+        db.session.commit()
+        
+        socketio.emit('new_notification', {
+            'user_id': friend_req.user_id,
+            'content': f"{session['username']} принял запрос в друзья"
+        })
+        
+        return jsonify({'success': True})
+    return jsonify({'error': 'Запрос не найден'}), 404
+
+@app.route('/decline_friend', methods=['POST'])
+@login_required
+def decline_friend():
+    data = request.get_json()
+    friend_req = Friend.query.filter_by(id=data['request_id'], friend_id=session['user_id']).first()
+    if friend_req:
+        db.session.delete(friend_req)
+        db.session.commit()
         return jsonify({'success': True})
     return jsonify({'error': 'Запрос не найден'}), 404
 
 @app.route('/get_notifications')
 @login_required
 def get_notifications():
-    notifs = Notification.query.filter_by(user_id=session['user_id'], read=False).order_by(Notification.created_at.desc()).limit(20).all()
-    return jsonify([{
-        'id': n.id,
-        'content': n.content,
-        'type': n.type,
-        'from_user': User.query.get(n.from_user_id).username if n.from_user_id else None,
-        'created_at': n.created_at.strftime('%H:%M')
-    } for n in notifs])
+    notifs = Notification.query.filter_by(user_id=session['user_id'], read=False).order_by(Notification.created_at.desc()).all()
+    result = []
+    for n in notifs:
+        result.append({
+            'id': n.id,
+            'content': n.content,
+            'type': n.type,
+            'data': n.data,
+            'from_user': User.query.get(n.from_user_id).username if n.from_user_id else None,
+            'created_at': n.created_at.strftime('%H:%M')
+        })
+    return jsonify(result)
 
 @app.route('/mark_notification_read', methods=['POST'])
 @login_required
@@ -319,15 +337,13 @@ def get_messages():
         'text': m.content,
         'file_url': m.file_url,
         'file_type': m.file_type,
-        'timestamp': m.timestamp.strftime('%H:%M'),
-        'avatar': User.query.get(m.user_id).avatar
+        'timestamp': m.timestamp.strftime('%H:%M')
     } for m in messages])
 
 @app.route('/get_users')
 @login_required
 def get_users():
     users = User.query.all()
-    current_user_id = session['user_id']
     return jsonify([{
         'id': u.id,
         'username': u.username,
@@ -335,7 +351,7 @@ def get_users():
         'status': u.status,
         'role': u.role,
         'avatar': u.avatar
-    } for u in users if u.id != current_user_id])
+    } for u in users])
 
 @app.route('/get_friends')
 @login_required
@@ -353,8 +369,7 @@ def get_friends():
                 'id': friend.id,
                 'username': friend.username,
                 'user_id_display': friend.user_id_display,
-                'status': friend.status,
-                'avatar': friend.avatar
+                'status': friend.status
             })
     return jsonify(result)
 
@@ -364,8 +379,8 @@ def get_friend_requests():
     requests = Friend.query.filter_by(friend_id=session['user_id'], status='pending').all()
     return jsonify([{
         'id': r.id,
-        'from_user': User.query.get(r.user_id).username,
         'from_user_id': r.user_id,
+        'from_user': User.query.get(r.user_id).username,
         'created_at': r.created_at.strftime('%H:%M')
     } for r in requests])
 
@@ -396,6 +411,7 @@ def logout():
         if user:
             user.status = 'offline'
             db.session.commit()
+            socketio.emit('user_offline', {'user_id': user.id})
     session.clear()
     return redirect(url_for('login'))
 
@@ -447,8 +463,7 @@ def handle_message(data):
         'text': text,
         'file_url': file_url,
         'file_type': file_type,
-        'timestamp': msg.timestamp.strftime('%H:%M'),
-        'avatar': user.avatar
+        'timestamp': msg.timestamp.strftime('%H:%M')
     }, room=room, broadcast=True)
 
 @socketio.on('typing')

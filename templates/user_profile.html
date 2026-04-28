@@ -2,182 +2,73 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>{{ user.username }} - ChatVerse</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <title>{{ user.username }}</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            max-width: 500px;
-            width: 100%;
-            background: #16213e;
-            border-radius: 24px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: fadeIn 0.3s;
-            color: white;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px;
-            text-align: center;
-        }
-        .avatar {
-            width: 100px;
-            height: 100px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            margin: 0 auto 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 50px;
-            overflow: hidden;
-        }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .user-id { font-family: monospace; font-size: 14px; opacity: 0.8; margin-top: 5px; }
-        .role-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-top: 8px; }
-        .role-owner { background: #ffd700; color: #333; }
-        .role-admin { background: #ff6b6b; }
-        .role-moderator { background: #4ecdc4; }
-        .role-helper { background: #45b7d1; }
-        .content { padding: 30px; }
-        .info-row { margin-bottom: 15px; padding: 10px; background: #0f3460; border-radius: 12px; }
-        .info-label { font-size: 12px; opacity: 0.7; margin-bottom: 5px; }
-        .info-value { font-size: 14px; }
-        .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-        button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-        button:hover { transform: translateY(-2px); opacity: 0.9; }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-success { background: #4ade80; color: #1a1a2e; }
-        .btn-warning { background: #f39c12; color: #1a1a2e; }
-        .btn-danger { background: #ef4444; color: white; }
-        .back-btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: rgba(255,255,255,0.1); color: white; text-decoration: none; border-radius: 25px; text-align: center; }
-        .role-select { width: 100%; padding: 10px; margin: 10px 0; border-radius: 10px; background: #0f3460; color: white; border: 1px solid #2a2a4a; }
-        hr { border-color: #2a2a4a; margin: 20px 0; }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
+        .container{max-width:500px;width:100%;background:#16213e;border-radius:24px;overflow:hidden;color:white}
+        .header{background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;text-align:center}
+        .avatar{width:100px;height:100px;background:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 15px;display:flex;align-items:center;justify-content:center;font-size:50px;overflow:hidden}
+        .avatar img{width:100%;height:100%;object-fit:cover}
+        .content{padding:30px}
+        .info-row{padding:10px;background:#0f3460;border-radius:12px;margin-bottom:15px}
+        button{padding:12px;border:none;border-radius:12px;cursor:pointer;font-weight:bold}
+        .btn-primary{background:#667eea;color:white}
+        .btn-warning{background:#f39c12;color:#1a1a2e}
+        .btn-danger{background:#ef4444;color:white}
+        .actions{display:flex;gap:10px;margin-top:20px}
+        .back-btn{display:inline-block;margin-top:20px;padding:10px 20px;background:rgba(255,255,255,0.1);border-radius:25px;text-decoration:none;color:white}
+        .role-select{width:100%;padding:10px;margin:10px 0;background:#0f3460;color:white;border-radius:10px}
+        hr{margin:20px 0;border-color:#2a2a4a}
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="avatar">{% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}</div>
-            <h2>{{ user.username }}</h2>
-            <div class="user-id">ID: {{ user.user_id_display }}</div>
-            <div class="role-badge role-{{ user.role }}">
-                {% if user.role == 'owner' %}👑 Владелец
-                {% elif user.role == 'admin' %}⚙️ Администратор
-                {% elif user.role == 'moderator' %}🛡️ Модератор
-                {% elif user.role == 'helper' %}🆘 Хелпер
-                {% else %}👤 Пользователь{% endif %}
-            </div>
-        </div>
-        <div class="content">
-            <div class="info-row">
-                <div class="info-label">📝 О себе</div>
-                <div class="info-value">{{ user.bio or 'Не указано' }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">📅 Дата регистрации</div>
-                <div class="info-value">{{ user.created_at.strftime('%d.%m.%Y') if user.created_at else 'Неизвестно' }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">🟢 Статус</div>
-                <div class="info-value">{{ 'В сети' if user.status == 'online' else 'Не в сети' }}</div>
-            </div>
-            
-            <div class="actions">
-                <button class="btn-primary" onclick="sendFriendRequest()">➕ Добавить в друзья</button>
-                <button class="btn-primary" onclick="startPrivateChat()">💬 Личное сообщение</button>
-            </div>
-            
-            {% if current_user.id != user.id and (current_user.role == 'owner' or (current_user.role == 'admin' and user.role != 'owner')) %}
-                <hr>
-                <h4 style="margin-bottom: 15px;">⚙️ Управление привилегиями</h4>
-                <select id="roleSelect" class="role-select">
-                    <option value="user" {% if user.role == 'user' %}selected{% endif %}>👤 Пользователь</option>
-                    <option value="helper" {% if user.role == 'helper' %}selected{% endif %}>🆘 Хелпер</option>
-                    <option value="moderator" {% if user.role == 'moderator' %}selected{% endif %}>🛡️ Модератор</option>
-                    {% if current_user.role == 'owner' %}
-                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>⚙️ Администратор</option>
-                    {% endif %}
-                </select>
-                <div class="actions" style="margin-top: 10px;">
-                    <button class="btn-warning" onclick="changeRole()">🎖️ Выдать привилегию</button>
-                    <button class="btn-danger" onclick="removeRole()">⬇️ Снять привилегию</button>
-                </div>
-            {% endif %}
-            
-            <hr>
-            <a href="/chat" class="back-btn">← Вернуться в чат</a>
+<div class="container">
+    <div class="header">
+        <div class="avatar">{% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}</div>
+        <h2>{{ user.username }}</h2>
+        <div>ID: {{ user.user_id_display }}</div>
+        <div style="margin-top:5px">
+            {% if user.role == 'owner' %}👑 Владелец
+            {% elif user.role == 'admin' %}⚙️ Админ
+            {% elif user.role == 'moderator' %}🛡️ Модератор
+            {% elif user.role == 'helper' %}🆘 Хелпер
+            {% else %}👤 Пользователь{% endif %}
         </div>
     </div>
-    
-    <script>
-        const targetUserId = {{ user.id }};
-        const currentUserRole = '{{ current_user.role }}';
+    <div class="content">
+        <div class="info-row"><strong>📝 О себе:</strong> {{ user.bio or 'Не указано' }}</div>
+        <div class="info-row"><strong>📅 Регистрация:</strong> {{ user.created_at.strftime('%d.%m.%Y') if user.created_at else 'Неизвестно' }}</div>
+        <div class="info-row"><strong>🟢 Статус:</strong> {{ 'В сети' if user.status == 'online' else 'Не в сети' }}</div>
         
-        function sendFriendRequest() {
-            fetch('/friend_request', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: targetUserId })
-            }).then(res => res.json()).then(data => {
-                if (data.success) alert('✅ Запрос отправлен!');
-                else alert('❌ ' + data.error);
-            });
-        }
+        <div class="actions">
+            <button class="btn-primary" onclick="sendRequest()">➕ В друзья</button>
+            <button class="btn-primary" onclick="window.close()">💬 Личное сообщение</button>
+        </div>
         
-        function startPrivateChat() {
-            window.opener?.postMessage({ type: 'startPrivateChat', userId: targetUserId }, '*');
-            window.close();
-        }
-        
-        function changeRole() {
-            const role = document.getElementById('roleSelect').value;
-            fetch('/change_role', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: targetUserId, role: role })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    alert('✅ Роль изменена!');
-                    location.reload();
-                } else alert('❌ ' + data.error);
-            });
-        }
-        
-        function removeRole() {
-            fetch('/change_role', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: targetUserId, role: 'user' })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    alert('✅ Привилегия снята!');
-                    location.reload();
-                } else alert('❌ ' + data.error);
-            });
-        }
-    </script>
+        {% if current_user.id != user.id and (current_user.role == 'owner' or (current_user.role == 'admin' and user.role != 'owner')) %}
+            <hr>
+            <h4>Управление привилегиями</h4>
+            <select id="roleSelect" class="role-select">
+                <option value="user">👤 Пользователь</option>
+                <option value="helper">🆘 Хелпер</option>
+                <option value="moderator">🛡️ Модератор</option>
+                {% if current_user.role == 'owner' %}<option value="admin">⚙️ Админ</option>{% endif %}
+            </select>
+            <div class="actions">
+                <button class="btn-warning" onclick="changeRole()">🎖️ Выдать</button>
+                <button class="btn-danger" onclick="removeRole()">⬇️ Снять</button>
+            </div>
+        {% endif %}
+        <hr>
+        <a href="/chat" class="back-btn">← Назад</a>
+    </div>
+</div>
+<script>
+    const uid={{ user.id }};
+    function sendRequest(){fetch('/friend_request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid})}).then(r=>r.json()).then(d=>alert(d.success?'✅ Запрос отправлен':'❌ '+d.error));}
+    function changeRole(){const role=document.getElementById('roleSelect').value;fetch('/change_role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,role:role})}).then(r=>r.json()).then(d=>{if(d.success){alert('✅ Роль изменена!');location.reload();}else alert('❌ '+d.error);});}
+    function removeRole(){fetch('/change_role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,role:'user'})}).then(r=>r.json()).then(d=>{if(d.success){alert('✅ Привилегия снята!');location.reload();}else alert('❌ '+d.error);});}
+</script>
 </body>
 </html>

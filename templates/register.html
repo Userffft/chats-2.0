@@ -1,6 +1,72 @@
-<form method="post">
-    <input type="text" name="username" placeholder="Логин" required>
-    <input type="password" name="password" placeholder="Пароль" required>
-    <button type="submit">Войти</button>
-</form>
-<a href="/register">Регистрация</a>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ChatVerse - Регистрация</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h2 { text-align: center; margin-bottom: 30px; color: #333; }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: inherit;
+        }
+        textarea { resize: vertical; min-height: 60px; }
+        input:focus, textarea:focus { outline: none; border-color: #667eea; }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        .error { color: red; text-align: center; margin-bottom: 15px; }
+        .footer { text-align: center; margin-top: 20px; }
+        .footer a { color: #667eea; text-decoration: none; }
+        .info { background: #e3f2fd; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-size: 14px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📝 Регистрация</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <div class="info">Вы получите уникальный ID (4-8 символов)</div>
+        <form method="post">
+            <input type="text" name="username" placeholder="Имя пользователя" required minlength="3">
+            <textarea name="bio" placeholder="О себе (необязательно)"></textarea>
+            <input type="password" name="password" placeholder="Пароль" required minlength="4">
+            <input type="password" name="confirm_password" placeholder="Подтвердите пароль" required>
+            <button type="submit">Зарегистрироваться</button>
+        </form>
+        <div class="footer"><a href="/login">Уже есть аккаунт?</a></div>
+    </div>
+</body>
+</html>

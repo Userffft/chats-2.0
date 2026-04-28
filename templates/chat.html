@@ -1,129 +1,532 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Чат с медиа</title>
+    <meta charset="UTF-8">
+    <title>ChatVerse - {{ user.username }}</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: Arial; max-width: 800px; margin: auto; }
-        #messages { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
-        .message { margin: 5px 0; }
-        .username { font-weight: bold; color: #2c3e50; }
-        .timestamp { font-size: 0.7em; color: gray; margin-left: 10px; }
-        img { max-width: 200px; max-height: 200px; }
-        audio { max-width: 200px; }
-        #controls button { margin: 5px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body.dark {
+            --bg: #1a1a2e;
+            --sidebar: #16213e;
+            --chat-bg: #1a1a2e;
+            --message-bg: #0f3460;
+            --text: #fff;
+            --border: #2a2a4a;
+            --accent: #667eea;
+        }
+        body.light {
+            --bg: #f0f2f5;
+            --sidebar: #fff;
+            --chat-bg: #fff;
+            --message-bg: #e3f2fd;
+            --text: #333;
+            --border: #e0e0e0;
+            --accent: #667eea;
+        }
+        body.purple {
+            --bg: #2d1b4e;
+            --sidebar: #3d2b6e;
+            --chat-bg: #2d1b4e;
+            --message-bg: #4d3b8e;
+            --text: #fff;
+            --border: #5d4bae;
+            --accent: #c084fc;
+        }
+        body.blue {
+            --bg: #0c4a6e;
+            --sidebar: #075985;
+            --chat-bg: #0c4a6e;
+            --message-bg: #0284c7;
+            --text: #fff;
+            --border: #38bdf8;
+            --accent: #38bdf8;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            height: 100vh;
+            display: flex;
+            color: var(--text);
+        }
+        .sidebar {
+            width: 280px;
+            background: var(--sidebar);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+        }
+        .user-info {
+            padding: 20px;
+            text-align: center;
+            background: var(--accent);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .avatar {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            overflow: hidden;
+        }
+        .rooms, .users, .friends {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .room-item, .user-item, .friend-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .room-item:hover, .user-item:hover, .friend-item:hover { background: rgba(255,255,255,0.1); }
+        .room-item.active { background: var(--accent); }
+        .online-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block; }
+        .offline-dot { width: 8px; height: 8px; background: #666; border-radius: 50%; display: inline-block; }
+        .chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            padding: 20px;
+            background: var(--sidebar);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.15s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-header { margin-bottom: 5px; }
+        .message-username { 
+            font-weight: bold; 
+            color: var(--accent); 
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .message-username:hover { text-decoration: underline; }
+        .timestamp { font-size: 11px; color: #888; }
+        .role-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
+        .role-owner { background: #ffd700; color: #333; }
+        .role-admin { background: #ff6b6b; color: white; }
+        .role-moderator { background: #4ecdc4; color: white; }
+        .role-helper { background: #45b7d1; color: white; }
+        .message-content {
+            background: var(--message-bg);
+            padding: 10px 15px;
+            border-radius: 15px;
+            display: inline-block;
+            max-width: 70%;
+        }
+        .message-image { max-width: 250px; border-radius: 10px; margin-top: 5px; cursor: pointer; }
+        .controls {
+            padding: 15px;
+            background: var(--sidebar);
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+        }
+        #messageInput {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-icon {
+            padding: 10px 15px;
+            background: var(--accent);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+        .typing { font-size: 12px; color: #888; padding: 5px 20px; }
+        .notification-badge {
+            background: red;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        .image-preview {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+        }
+        .image-preview img { max-width: 90%; max-height: 90%; }
+        .confirm-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 1001;
+            color: #333;
+        }
+        .confirm-modal button { margin: 10px; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; }
+        .confirm-yes { background: #4ade80; color: white; }
+        .confirm-no { background: #ef4444; color: white; }
     </style>
 </head>
-<body>
-    <h2>Чат: {{ username }}</h2>
-    <button id="logoutBtn">Выйти</button>
-    <div id="messages">
-        {% for msg in messages %}
-            <div class="message">
-                <span class="username">{{ msg.user.username }}:</span>
-                {% if msg.content %}<span>{{ msg.content }}</span>{% endif %}
-                {% if msg.file_type == 'image' %}
-                    <img src="{{ msg.file_url }}" alt="image">
-                {% elif msg.file_type == 'audio' %}
-                    <audio controls src="{{ msg.file_url }}"></audio>
-                {% endif %}
-                <span class="timestamp">{{ msg.timestamp.strftime('%H:%M') }}</span>
+<body class="{{ user.theme }}">
+    <div class="sidebar">
+        <div class="user-info" onclick="location.href='/profile'">
+            <div class="avatar">
+                {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}
             </div>
-        {% endfor %}
+            <strong>{{ user.username }}</strong>
+            <div style="font-size: 11px; opacity:0.7;">ID: {{ user.user_id_display }}</div>
+            <div style="font-size: 10px; margin-top: 5px;">
+                {% if user.role == 'owner' %}👑 Владелец
+                {% elif user.role == 'admin' %}⚙️ Админ
+                {% elif user.role == 'moderator' %}🛡️ Модератор
+                {% elif user.role == 'helper' %}🆘 Хелпер
+                {% else %}👤 Пользователь{% endif %}
+            </div>
+        </div>
+        <div class="rooms">
+            <div style="margin-bottom: 10px;">📌 Комнаты</div>
+            <div class="room-item active" data-room="general"># Общий чат</div>
+            <div class="room-item" data-room="random">🎲 Случайный</div>
+            <div class="room-item" data-room="help">❓ Помощь</div>
+        </div>
+        <div class="friends">
+            <div style="margin-bottom: 10px;">👥 Друзья <span id="friendsBadge"></span></div>
+            <div id="friendsList"></div>
+            <div style="margin-top: 10px;" id="friendRequestsLink">
+                <a href="#" onclick="showFriendRequests()" style="color: var(--accent); font-size: 12px;">📩 Заявки в друзья</a>
+            </div>
+        </div>
+        <div class="users">
+            <div style="margin-bottom: 10px;">🌐 Пользователи (<span id="onlineCount">0</span>)</div>
+            <div id="usersList"></div>
+        </div>
     </div>
-    <div id="controls">
-        <input type="text" id="messageInput" placeholder="Текст..." style="width: 60%;">
-        <button id="sendBtn">Отправить</button>
-        <input type="file" id="imageInput" accept="image/*">
-        <button id="uploadImageBtn">📷 Изображение</button>
-        <button id="recordBtn">🎤 Записать голосовое</button>
-        <button id="stopRecordBtn" disabled>⏹️ Остановить</button>
+    <div class="chat">
+        <div class="chat-header">
+            <h2><span id="currentRoomName">Общий чат</span></h2>
+            <div style="display: flex; gap: 10px;">
+                <div id="notificationsBtn" style="position: relative; cursor: pointer;">🔔<span id="notifBadge" style="display:none;"></span></div>
+                <button class="btn" onclick="location.href='/logout'">🚪 Выйти</button>
+            </div>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div class="typing" id="typingIndicator"></div>
+        <div class="controls">
+            <input type="text" id="messageInput" placeholder="Введите сообщение...">
+            <input type="file" id="imageInput" accept="image/*" style="display:none">
+            <button class="btn-icon" id="imageBtn">📷</button>
+            <button class="btn" id="sendBtn">📤 Отправить</button>
+        </div>
     </div>
 
     <script>
         const socket = io();
-        const messagesDiv = document.getElementById('messages');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const imageInput = document.getElementById('imageInput');
-        const uploadImageBtn = document.getElementById('uploadImageBtn');
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopRecordBtn');
-
-        let mediaRecorder;
-        let audioChunks = [];
-
-        // получение нового сообщения
-        socket.on('new_message', (msg) => {
-            appendMessage(msg.username, msg.text, msg.file_url, msg.file_type, msg.timestamp);
-        });
-
-        function appendMessage(username, text, fileUrl, fileType, timestamp) {
+        let currentRoom = 'general';
+        let typingTimeout;
+        let currentUserId = {{ user.id }};
+        let currentUserRole = '{{ user.role }}';
+        let pendingFile = null;
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function getRoleBadge(role) {
+            const badges = {
+                'owner': '<span class="role-badge role-owner">👑 Владелец</span>',
+                'admin': '<span class="role-badge role-admin">⚙️ Админ</span>',
+                'moderator': '<span class="role-badge role-moderator">🛡️ Модератор</span>',
+                'helper': '<span class="role-badge role-helper">🆘 Хелпер</span>'
+            };
+            return badges[role] || '';
+        }
+        
+        function addMessage(msg) {
             const div = document.createElement('div');
             div.className = 'message';
-            div.innerHTML = `<span class="username">${username}:</span> 
-                             ${text ? `<span>${text}</span>` : ''}
-                             ${fileType === 'image' ? `<br><img src="${fileUrl}">` : ''}
-                             ${fileType === 'audio' ? `<br><audio controls src="${fileUrl}"></audio>` : ''}
-                             <span class="timestamp">${timestamp}</span>`;
-            messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            div.innerHTML = `
+                <div class="message-header">
+                    <span class="message-username" onclick="openUserProfile(${msg.user_id})">${escapeHtml(msg.username)}</span>
+                    ${getRoleBadge(msg.user_role)}
+                    <span class="timestamp">${msg.timestamp}</span>
+                </div>
+                <div class="message-content">
+                    ${msg.text ? `<p>${escapeHtml(msg.text)}</p>` : ''}
+                    ${msg.file_url ? `<img class="message-image" src="${msg.file_url}" onclick="showImagePreview('${msg.file_url}')">` : ''}
+                </div>
+            `;
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
-
-        // отправка текстового сообщения
-        sendBtn.onclick = () => {
-            const text = messageInput.value.trim();
+        
+        function showImagePreview(url) {
+            const div = document.createElement('div');
+            div.className = 'image-preview';
+            div.onclick = () => div.remove();
+            div.innerHTML = `<img src="${url}">`;
+            document.body.appendChild(div);
+        }
+        
+        function openUserProfile(userId) {
+            window.open(`/user/${userId}`, '_blank', 'width=500,height=600');
+        }
+        
+        function loadMessages(room) {
+            fetch(`/get_messages?room=${room}`)
+                .then(res => res.json())
+                .then(messages => {
+                    const container = document.getElementById('messages');
+                    container.innerHTML = '';
+                    messages.forEach(msg => addMessage(msg));
+                });
+        }
+        
+        function loadUsers() {
+            fetch('/get_users')
+                .then(res => res.json())
+                .then(users => {
+                    const container = document.getElementById('usersList');
+                    const onlineCount = users.filter(u => u.status === 'online').length;
+                    document.getElementById('onlineCount').innerText = onlineCount;
+                    container.innerHTML = '';
+                    users.forEach(user => {
+                        container.innerHTML += `
+                            <div class="user-item" onclick="openUserProfile(${user.id})">
+                                <span class="${user.status === 'online' ? 'online-dot' : 'offline-dot'}"></span>
+                                ${escapeHtml(user.username)}
+                                <span style="font-size: 10px; margin-left: auto;">${user.user_id_display}</span>
+                            </div>
+                        `;
+                    });
+                });
+        }
+        
+        function loadFriends() {
+            fetch('/get_friends')
+                .then(res => res.json())
+                .then(friends => {
+                    const container = document.getElementById('friendsList');
+                    if (friends.length === 0) {
+                        container.innerHTML = '<div style="font-size: 12px; color: #888;">Нет друзей</div>';
+                        return;
+                    }
+                    container.innerHTML = '';
+                    friends.forEach(friend => {
+                        container.innerHTML += `
+                            <div class="friend-item" onclick="openUserProfile(${friend.id})">
+                                <span class="${friend.status === 'online' ? 'online-dot' : 'offline-dot'}"></span>
+                                ${escapeHtml(friend.username)}
+                            </div>
+                        `;
+                    });
+                });
+        }
+        
+        function loadFriendRequests() {
+            fetch('/get_friend_requests')
+                .then(res => res.json())
+                .then(requests => {
+                    const badge = document.getElementById('friendsBadge');
+                    if (requests.length > 0) {
+                        badge.innerHTML = `<span class="notification-badge">${requests.length}</span>`;
+                    } else {
+                        badge.innerHTML = '';
+                    }
+                });
+        }
+        
+        function showFriendRequests() {
+            fetch('/get_friend_requests')
+                .then(res => res.json())
+                .then(requests => {
+                    if (requests.length === 0) {
+                        alert('Нет заявок в друзья');
+                        return;
+                    }
+                    let msg = '📩 Заявки в друзья:\n';
+                    requests.forEach(r => {
+                        msg += `\n${r.from_user} (${r.created_at})`;
+                    });
+                    alert(msg);
+                });
+        }
+        
+        function loadNotifications() {
+            fetch('/get_notifications')
+                .then(res => res.json())
+                .then(notifs => {
+                    const badge = document.getElementById('notifBadge');
+                    if (notifs.length > 0) {
+                        badge.innerHTML = notifs.length;
+                        badge.style.display = 'inline-block';
+                        badge.style.background = 'red';
+                        badge.style.color = 'white';
+                        badge.style.borderRadius = '50%';
+                        badge.style.padding = '2px 6px';
+                        badge.style.fontSize = '10px';
+                        badge.style.position = 'absolute';
+                        badge.style.top = '-5px';
+                        badge.style.right = '-10px';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                });
+        }
+        
+        socket.on('new_message', (msg) => {
+            if (msg.room === currentRoom) addMessage(msg);
+        });
+        
+        socket.on('user_online', () => { loadUsers(); loadFriends(); });
+        socket.on('user_offline', () => { loadUsers(); loadFriends(); });
+        socket.on('user_typing', (data) => {
+            const typingDiv = document.getElementById('typingIndicator');
+            if (data.is_typing) {
+                typingDiv.innerHTML = `${escapeHtml(data.username)} печатает...`;
+                setTimeout(() => { typingDiv.innerHTML = ''; }, 2000);
+            }
+        });
+        
+        document.getElementById('sendBtn').onclick = () => {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
             if (text) {
-                socket.emit('message', { text, room: 'general' });
-                messageInput.value = '';
+                socket.emit('message', { text, room: currentRoom });
+                input.value = '';
             }
         };
-
-        // загрузка изображения
-        uploadImageBtn.onclick = async () => {
-            const file = imageInput.files[0];
+        
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('sendBtn').click();
+        });
+        
+        let isTyping = false;
+        document.getElementById('messageInput').addEventListener('input', () => {
+            if (!isTyping) {
+                isTyping = true;
+                socket.emit('typing', { room: currentRoom, is_typing: true });
+            }
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+                socket.emit('typing', { room: currentRoom, is_typing: false });
+            }, 1000);
+        });
+        
+        document.getElementById('imageBtn').onclick = () => document.getElementById('imageInput').click();
+        document.getElementById('imageInput').onchange = async (e) => {
+            const file = e.target.files[0];
             if (!file) return;
-            const formData = new FormData();
-            formData.append('file', file);
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.file_url) {
-                socket.emit('message', { text: '', file_url: data.file_url, file_type: 'image', room: 'general' });
-            }
-            imageInput.value = '';
-        };
-
-        // запись голосового
-        recordBtn.onclick = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-            mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            
+            if (confirm(`Отправить изображение "${file.name}"?`)) {
                 const formData = new FormData();
-                formData.append('file', audioBlob, 'voice.webm');
+                formData.append('file', file);
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.file_url) {
-                    socket.emit('message', { text: '', file_url: data.file_url, file_type: 'audio', room: 'general' });
+                    socket.emit('message', { file_url: data.file_url, file_type: 'image', room: currentRoom });
                 }
-                stream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('imageInput').value = '';
+        };
+        
+        document.querySelectorAll('.room-item').forEach(room => {
+            room.onclick = () => {
+                document.querySelectorAll('.room-item').forEach(r => r.classList.remove('active'));
+                room.classList.add('active');
+                currentRoom = room.getAttribute('data-room');
+                document.getElementById('currentRoomName').innerText = room.innerText.trim();
+                loadMessages(currentRoom);
+                socket.emit('join', { room: currentRoom });
             };
-            mediaRecorder.start();
-            recordBtn.disabled = true;
-            stopBtn.disabled = false;
+        });
+        
+        document.getElementById('notificationsBtn').onclick = () => {
+            fetch('/get_notifications')
+                .then(res => res.json())
+                .then(notifs => {
+                    if (notifs.length === 0) {
+                        alert('Нет уведомлений');
+                        return;
+                    }
+                    let msg = '📢 Уведомления:\n';
+                    notifs.forEach(n => {
+                        msg += `\n${n.content} (${n.created_at})`;
+                        fetch('/mark_notification_read', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ notification_id: n.id })
+                        });
+                    });
+                    alert(msg);
+                    loadNotifications();
+                });
         };
-
-        stopBtn.onclick = () => {
-            mediaRecorder.stop();
-            recordBtn.disabled = false;
-            stopBtn.disabled = true;
-        };
-
-        document.getElementById('logoutBtn').onclick = () => {
-            window.location.href = '/logout';
-        };
+        
+        loadMessages('general');
+        loadUsers();
+        loadFriends();
+        loadFriendRequests();
+        loadNotifications();
+        setInterval(() => { loadUsers(); loadFriends(); loadNotifications(); }, 10000);
     </script>
 </body>
 </html>

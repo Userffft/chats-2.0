@@ -10,17 +10,18 @@ from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret-key-2024'
+app.config['SECRET_KEY'] = 'your-secret-key-2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
+# Создаём папки для загрузок
 os.makedirs('uploads/images', exist_ok=True)
 os.makedirs('uploads/audio', exist_ok=True)
 os.makedirs('uploads/avatars', exist_ok=True)
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # ============ МОДЕЛИ ============
 
@@ -32,7 +33,7 @@ class User(db.Model):
     avatar = db.Column(db.String(200), default='')
     bio = db.Column(db.String(200), default='')
     status = db.Column(db.String(50), default='online')
-    role = db.Column(db.String(50), default='user')
+    role = db.Column(db.String(50), default='user')  # owner, admin, moderator, helper, user
     theme = db.Column(db.String(20), default='dark')
     last_avatar_change = db.Column(db.DateTime, default=None)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -44,6 +45,22 @@ class Message(db.Model):
     content = db.Column(db.Text)
     file_url = db.Column(db.String(200))
     file_type = db.Column(db.String(20))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Room(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PrivateMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    from_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    to_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    content = db.Column(db.Text)
+    file_url = db.Column(db.String(200))
+    file_type = db.Column(db.String(20))
+    read = db.Column(db.Boolean, default=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Friend(db.Model):
@@ -78,8 +95,22 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def role_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('login'))
+            user = User.query.get(session['user_id'])
+            if user.role not in roles:
+                return jsonify({'error': 'Нет прав'}), 403
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
 with app.app_context():
     db.create_all()
+    # Создаём владельца, если нет
     if not User.query.filter_by(username='MrAizex').first():
         owner = User(
             username='MrAizex',
@@ -90,6 +121,22 @@ with app.app_context():
         db.session.add(owner)
         db.session.commit()
         print("✅ Владелец MrAizex создан! Пароль: admin123")
+    # Создаём стандартные комнаты, если нет
+    for room_name in ['general', 'random', 'help']:
+        if not Room.query.filter_by(name=room_name).first():
+            room = Room(name=room_name, creator_id=1)
+            db.session.add(room)
+    db.session.commit()
+
+def get_ru_role(role):
+    roles = {
+        'owner': 'Владелец',
+        'admin': 'Администратор',
+        'moderator': 'Модератор',
+        'helper': 'Помощник',
+        'user': 'Пользователь'
+    }
+    return roles.get(role, 'Пользователь')
 
 # ============ МАРШРУТЫ ============
 
@@ -153,7 +200,14 @@ def register():
 @login_required
 def chat():
     user = User.query.get(session['user_id'])
-    return render_template('chat.html', user=user)
+    rooms = Room.query.all()
+    return render_template('chat.html', user=user, rooms=rooms, get_ru_role=get_ru_role)
+
+@app.route('/profile')
+@login_required
+def profile():
+    user = User.query.get(session['user_id'])
+    return render_template('profile_modal.html', user=user, get_ru_role=get_ru_role)
 
 @app.route('/get_user/<int:user_id>')
 @login_required
@@ -165,7 +219,7 @@ def get_user(user_id):
         'user_id_display': user.user_id_display,
         'bio': user.bio or '',
         'avatar': user.avatar,
-        'role': user.role,
+        'role': get_ru_role(user.role),
         'status': user.status,
         'created_at': user.created_at.strftime('%d.%m.%Y')
     })
@@ -174,28 +228,22 @@ def get_user(user_id):
 @login_required
 def update_profile():
     user = User.query.get(session['user_id'])
-    
     if 'avatar' in request.files:
         file = request.files['avatar']
         if file and file.filename:
             if user.last_avatar_change and datetime.utcnow() - user.last_avatar_change < timedelta(days=7):
                 return jsonify({'error': 'Аватар можно менять раз в неделю!'}), 400
-            
             filename = f"{user.id}_{datetime.utcnow().timestamp()}_{secure_filename(file.filename)}"
             path = os.path.join('uploads/avatars', filename)
             file.save(path)
             user.avatar = f'/uploads/avatars/{filename}'
             user.last_avatar_change = datetime.utcnow()
-    
     if 'bio' in request.form:
         user.bio = request.form['bio']
-    
     if 'theme' in request.form:
         user.theme = request.form['theme']
-    
     if 'new_password' in request.form and request.form['new_password']:
         user.password = generate_password_hash(request.form['new_password'])
-    
     db.session.commit()
     return jsonify({'success': True})
 
@@ -205,22 +253,53 @@ def change_role():
     current_user = User.query.get(session['user_id'])
     if current_user.role not in ['owner', 'admin']:
         return jsonify({'error': 'Нет прав'}), 403
-    
     data = request.get_json()
     target_user = User.query.get(data['user_id'])
     if not target_user:
         return jsonify({'error': 'Пользователь не найден'}), 404
-    
-    if current_user.role == 'owner' and target_user.role != 'owner':
+    allowed = ['user', 'helper', 'moderator']
+    if current_user.role == 'owner':
+        allowed.append('admin')
+    if target_user.role == 'owner' and current_user.role != 'owner':
+        return jsonify({'error': 'Нельзя изменить роль владельца'}), 403
+    if data['role'] in allowed and target_user.role != 'owner':
         target_user.role = data['role']
         db.session.commit()
-        return jsonify({'success': True, 'new_role': target_user.role})
-    elif current_user.role == 'admin' and target_user.role in ['user', 'helper', 'moderator']:
-        target_user.role = data['role']
-        db.session.commit()
-        return jsonify({'success': True, 'new_role': target_user.role})
-    
-    return jsonify({'error': 'Недостаточно прав'}), 403
+        return jsonify({'success': True, 'new_role': get_ru_role(target_user.role)})
+    return jsonify({'error': 'Недопустимая роль'}), 403
+
+@app.route('/create_room', methods=['POST'])
+@login_required
+def create_room():
+    data = request.get_json()
+    name = data.get('name', '').strip().lower().replace(' ', '_')
+    if not name:
+        return jsonify({'error': 'Название не может быть пустым'}), 400
+    if Room.query.filter_by(name=name).first():
+        return jsonify({'error': 'Комната уже существует'}), 400
+    room = Room(name=name, creator_id=session['user_id'])
+    db.session.add(room)
+    db.session.commit()
+    return jsonify({'success': True, 'room_name': name})
+
+@app.route('/delete_room', methods=['POST'])
+@login_required
+def delete_room():
+    current_user = User.query.get(session['user_id'])
+    if current_user.role not in ['owner', 'admin']:
+        return jsonify({'error': 'Нет прав'}), 403
+    data = request.get_json()
+    room_name = data.get('room_name')
+    if room_name in ['general', 'random', 'help']:
+        return jsonify({'error': 'Нельзя удалить стандартную комнату'}), 400
+    room = Room.query.filter_by(name=room_name).first()
+    if not room:
+        return jsonify({'error': 'Комната не найдена'}), 404
+    # Удаляем сообщения из комнаты
+    Message.query.filter_by(room=room_name).delete()
+    db.session.delete(room)
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/friend_request', methods=['POST'])
 @login_required
@@ -229,21 +308,17 @@ def friend_request():
     friend = User.query.get(data['user_id'])
     if not friend:
         return jsonify({'error': 'Пользователь не найден'}), 404
-    
     existing = Friend.query.filter(
         ((Friend.user_id == session['user_id']) & (Friend.friend_id == friend.id)) |
         ((Friend.user_id == friend.id) & (Friend.friend_id == session['user_id']))
     ).first()
-    
     if existing:
         if existing.status == 'pending':
             return jsonify({'error': 'Запрос уже отправлен'}), 400
         elif existing.status == 'accepted':
             return jsonify({'error': 'Уже в друзьях'}), 400
-    
     friend_req = Friend(user_id=session['user_id'], friend_id=friend.id, status='pending')
     db.session.add(friend_req)
-    
     notif = Notification(
         user_id=friend.id,
         from_user_id=session['user_id'],
@@ -253,12 +328,10 @@ def friend_request():
     )
     db.session.add(notif)
     db.session.commit()
-    
     socketio.emit('new_notification', {
         'user_id': friend.id,
         'content': f"{session['username']} хочет добавить вас в друзья"
     })
-    
     return jsonify({'success': True})
 
 @app.route('/accept_friend', methods=['POST'])
@@ -269,7 +342,6 @@ def accept_friend():
     if friend_req:
         friend_req.status = 'accepted'
         db.session.commit()
-        
         notif = Notification(
             user_id=friend_req.user_id,
             from_user_id=session['user_id'],
@@ -278,12 +350,10 @@ def accept_friend():
         )
         db.session.add(notif)
         db.session.commit()
-        
         socketio.emit('new_notification', {
             'user_id': friend_req.user_id,
             'content': f"{session['username']} принял запрос в друзья"
         })
-        
         return jsonify({'success': True})
     return jsonify({'error': 'Запрос не найден'}), 404
 
@@ -332,8 +402,9 @@ def get_messages():
     return jsonify([{
         'id': m.id,
         'username': User.query.get(m.user_id).username,
-        'user_role': User.query.get(m.user_id).role,
+        'user_role': get_ru_role(User.query.get(m.user_id).role),
         'user_id': m.user_id,
+        'avatar': User.query.get(m.user_id).avatar,
         'text': m.content,
         'file_url': m.file_url,
         'file_type': m.file_type,
@@ -349,7 +420,7 @@ def get_users():
         'username': u.username,
         'user_id_display': u.user_id_display,
         'status': u.status,
-        'role': u.role,
+        'role': get_ru_role(u.role),
         'avatar': u.avatar
     } for u in users])
 
@@ -369,7 +440,8 @@ def get_friends():
                 'id': friend.id,
                 'username': friend.username,
                 'user_id_display': friend.user_id_display,
-                'status': friend.status
+                'status': friend.status,
+                'avatar': friend.avatar
             })
     return jsonify(result)
 
@@ -384,6 +456,55 @@ def get_friend_requests():
         'created_at': r.created_at.strftime('%H:%M')
     } for r in requests])
 
+@app.route('/send_private_message', methods=['POST'])
+@login_required
+def send_private_message():
+    data = request.get_json()
+    to_user = User.query.get(data['to_user_id'])
+    if not to_user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    content = data.get('content', '').strip()
+    file_url = data.get('file_url')
+    file_type = data.get('file_type')
+    pm = PrivateMessage(
+        from_user_id=session['user_id'],
+        to_user_id=to_user.id,
+        content=content,
+        file_url=file_url,
+        file_type=file_type
+    )
+    db.session.add(pm)
+    db.session.commit()
+    # Отправляем уведомление получателю через socket
+    socketio.emit('private_message', {
+        'from_user': session['username'],
+        'from_user_id': session['user_id'],
+        'content': content,
+        'file_url': file_url,
+        'file_type': file_type,
+        'timestamp': pm.timestamp.strftime('%H:%M')
+    }, room=f'user_{to_user.id}')
+    return jsonify({'success': True})
+
+@app.route('/get_private_messages/<int:user_id>')
+@login_required
+def get_private_messages(user_id):
+    messages = PrivateMessage.query.filter(
+        ((PrivateMessage.from_user_id == session['user_id']) & (PrivateMessage.to_user_id == user_id)) |
+        ((PrivateMessage.from_user_id == user_id) & (PrivateMessage.to_user_id == session['user_id']))
+    ).order_by(PrivateMessage.timestamp).limit(100).all()
+    return jsonify([{
+        'id': m.id,
+        'from_user': User.query.get(m.from_user_id).username,
+        'from_user_id': m.from_user_id,
+        'to_user_id': m.to_user_id,
+        'content': m.content,
+        'file_url': m.file_url,
+        'file_type': m.file_type,
+        'timestamp': m.timestamp.strftime('%H:%M'),
+        'read': m.read
+    } for m in messages])
+
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload():
@@ -392,7 +513,6 @@ def upload():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'empty'}), 400
-    
     file_type = 'image' if file.content_type.startswith('image/') else 'audio'
     folder = 'images' if file_type == 'image' else 'audio'
     filename = f"{datetime.utcnow().timestamp()}_{secure_filename(file.filename)}"
@@ -458,8 +578,9 @@ def handle_message(data):
     emit('new_message', {
         'id': msg.id,
         'username': user.username,
-        'user_role': user.role,
+        'user_role': get_ru_role(user.role),
         'user_id': user.id,
+        'avatar': user.avatar,
         'text': text,
         'file_url': file_url,
         'file_type': file_type,
@@ -478,6 +599,11 @@ def handle_typing(data):
 def handle_join(data):
     room = data.get('room', 'general')
     join_room(room)
+
+@socketio.on('join_private')
+def handle_join_private(data):
+    user_id = data.get('user_id')
+    join_room(f'user_{user_id}')
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

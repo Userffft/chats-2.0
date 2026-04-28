@@ -6,17 +6,29 @@ from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
+# СНАЧАЛА создаём приложение
 app = Flask(__name__)
+
+# ПОТОМ настраиваем конфигурацию
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///chat.db')
+
+# Настройка базы данных
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///chat.db')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# Настройка загрузки файлов
+app.config['UPLOAD_FOLDER_IMAGES'] = 'uploads/images'
+app.config['UPLOAD_FOLDER_AUDIO'] = 'uploads/audio'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
 # Создаём папки для загрузок
-os.makedirs('uploads/images', exist_ok=True)
-os.makedirs('uploads/audio', exist_ok=True)
+os.makedirs(app.config['UPLOAD_FOLDER_IMAGES'], exist_ok=True)
+os.makedirs(app.config['UPLOAD_FOLDER_AUDIO'], exist_ok=True)
 
+# Инициализируем расширения
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -25,6 +37,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    avatar = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Message(db.Model):
@@ -47,7 +60,7 @@ class Message(db.Model):
             'timestamp': self.timestamp.strftime('%H:%M')
         }
 
-# Создаём таблицы
+# Создаём таблицы (это должно быть ПОСЛЕ определения моделей)
 with app.app_context():
     db.create_all()
 
@@ -179,7 +192,7 @@ HTML_TEMPLATE = '''
     <div id="messages">
         {% for msg in messages %}
             <div class="message">
-                <span class="username">{{ msg.username }}:</span>
+                <span class="username">{{ msg.user.username }}:</span>
                 {% if msg.content %}<span>{{ msg.content }}</span>{% endif %}
                 {% if msg.file_type == 'image' %}
                     <br><img src="{{ msg.file_url }}">
@@ -280,6 +293,8 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
-# Это ОЧЕНЬ ВАЖНО для Render - переменная app должна существовать
+from flask import render_template_string
+
+# Это для локального запуска (Render использует Gunicorn, поэтому этот блок не обязателен)
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

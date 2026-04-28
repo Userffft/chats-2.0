@@ -4,63 +4,108 @@
     <meta charset="UTF-8">
     <title>Мой профиль</title>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
-        .container{max-width:500px;width:100%;background:#16213e;border-radius:24px;overflow:hidden;color:white}
-        .header{background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;text-align:center}
-        .avatar{width:100px;height:100px;background:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 15px;display:flex;align-items:center;justify-content:center;font-size:50px;overflow:hidden;cursor:pointer}
-        .avatar img{width:100%;height:100%;object-fit:cover}
-        .form-container{padding:30px}
-        input,textarea,select{width:100%;padding:12px;margin:10px 0;background:#0f3460;border:1px solid #2a2a4a;border-radius:12px;color:white}
-        button{width:100%;padding:12px;background:#667eea;border:none;border-radius:12px;color:white;cursor:pointer}
-        .back-btn{display:inline-block;margin-top:20px;padding:10px 20px;background:rgba(255,255,255,0.1);border-radius:25px;text-decoration:none;color:white}
-        .success{background:#4ade80;color:#1a1a2e;padding:12px;border-radius:12px;margin-bottom:20px}
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+        .container {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 20px;
+            width: 400px;
+            text-align: center;
+        }
+        .avatar {
+            width: 100px;
+            height: 100px;
+            background: #667eea;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #0f3460;
+            border: none;
+            border-radius: 8px;
+            color: white;
+        }
+        button {
+            background: #667eea;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            width: 100%;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .error { background: #ef4444; }
+        .success { background: #4ade80; color: #1a1a2e; }
+        a { color: #aaa; display: block; margin-top: 15px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="header">
-        <div class="avatar" onclick="document.getElementById('avatarInput').click()">
-            {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}
-        </div>
-        <h2>{{ user.username }}</h2>
-        <div>ID: {{ user.user_id_display }}</div>
-        <div style="margin-top:5px">
-            {% if user.role == 'owner' %}👑 Владелец
-            {% elif user.role == 'admin' %}⚙️ Админ
-            {% elif user.role == 'moderator' %}🛡️ Модератор
-            {% elif user.role == 'helper' %}🆘 Хелпер
-            {% else %}👤 Пользователь{% endif %}
-        </div>
+    <div class="avatar" onclick="document.getElementById('avatarInput').click()">
+        {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}
     </div>
-    <div class="form-container">
-        <div id="status"></div>
-        <form id="profileForm" enctype="multipart/form-data">
-            <input type="file" id="avatarInput" name="avatar" accept="image/*" style="display:none">
-            <textarea name="bio" placeholder="О себе">{{ user.bio }}</textarea>
-            <select name="theme">
-                <option value="dark" {% if user.theme=='dark' %}selected{% endif %}>🌙 Тёмная</option>
-                <option value="light" {% if user.theme=='light' %}selected{% endif %}>☀️ Светлая</option>
-                <option value="purple" {% if user.theme=='purple' %}selected{% endif %}>💜 Фиолетовая</option>
-                <option value="blue" {% if user.theme=='blue' %}selected{% endif %}>💙 Синяя</option>
-            </select>
-            <input type="password" name="new_password" placeholder="Новый пароль">
-            <button type="submit">Сохранить</button>
-        </form>
-        <a href="/chat" class="back-btn">← Вернуться в чат</a>
+    <h2>{{ user.username }}</h2>
+    <div>ID: {{ user.user_id_display }}</div>
+    <div>Роль: 
+        {% if user.role == 'owner' %}Владелец
+        {% elif user.role == 'admin' %}Администратор
+        {% elif user.role == 'moderator' %}Модератор
+        {% elif user.role == 'helper' %}Хелпер
+        {% else %}Пользователь{% endif %}
     </div>
+    <div id="status"></div>
+    <form id="profileForm" enctype="multipart/form-data">
+        <input type="file" id="avatarInput" name="avatar" accept="image/*" style="display:none">
+        <textarea name="bio" placeholder="О себе">{{ user.bio }}</textarea>
+        <select name="theme">
+            <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>Тёмная</option>
+            <option value="light" {% if user.theme == 'light' %}selected{% endif %}>Светлая</option>
+            <option value="purple" {% if user.theme == 'purple' %}selected{% endif %}>Фиолетовая</option>
+            <option value="blue" {% if user.theme == 'blue' %}selected{% endif %}>Синяя</option>
+        </select>
+        <input type="password" name="new_password" placeholder="Новый пароль (оставьте пустым)">
+        <button type="submit">Сохранить</button>
+    </form>
+    <a href="/chat">← Вернуться в чат</a>
 </div>
 <script>
-    document.getElementById('profileForm').onsubmit=async(e)=>{
+    document.getElementById('profileForm').onsubmit = async (e) => {
         e.preventDefault();
-        const fd=new FormData(e.target);
-        const res=await fetch('/update_profile',{method:'POST',body:fd});
-        const data=await res.json();
-        const div=document.getElementById('status');
-        if(data.success){div.innerHTML='<div class="success">✅ Профиль обновлён!</div>';setTimeout(()=>location.reload(),1500);}
-        else div.innerHTML='<div class="success" style="background:#ef4444">❌ Ошибка</div>';
+        let fd = new FormData(e.target);
+        let res = await fetch('/update_profile', { method: 'POST', body: fd });
+        let data = await res.json();
+        let statusDiv = document.getElementById('status');
+        if (data.success) {
+            statusDiv.innerHTML = '<div class="message success">✅ Профиль обновлён</div>';
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            statusDiv.innerHTML = `<div class="message error">❌ ${data.error}</div>`;
+        }
     };
-    document.getElementById('avatarInput').onchange=()=>document.getElementById('profileForm').submit();
+    document.getElementById('avatarInput').onchange = () => document.getElementById('profileForm').submit();
 </script>
 </body>
 </html>

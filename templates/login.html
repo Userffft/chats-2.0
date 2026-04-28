@@ -2,29 +2,64 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>ChatVerse - Вход</title>
+    <title>Вход - ChatVerse</title>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;justify-content:center;align-items:center}
-        .container{background:white;padding:40px;border-radius:20px;width:380px;text-align:center}
-        h2{color:#333;margin-bottom:30px}
-        input{width:100%;padding:12px;margin:10px 0;border:2px solid #e0e0e0;border-radius:10px}
-        button{width:100%;padding:12px;background:#667eea;color:white;border:none;border-radius:10px;cursor:pointer;font-size:16px}
-        .error{color:red;margin-bottom:15px}
-        .footer{margin-top:20px}
-        .footer a{color:#667eea;text-decoration:none}
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #16213e;
+            padding: 40px;
+            border-radius: 20px;
+            width: 350px;
+            color: white;
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            background: #0f3460;
+            color: white;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .error {
+            color: #ef4444;
+            margin-bottom: 15px;
+        }
+        a {
+            color: #aaa;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <h2>💬 ChatVerse</h2>
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <form method="post">
-        <input type="text" name="username" placeholder="Имя пользователя или ID" required autofocus>
-        <input type="password" name="password" placeholder="Пароль" required>
-        <button type="submit">Войти</button>
-    </form>
-    <div class="footer"><a href="/register">Нет аккаунта? Зарегистрироваться</a></div>
-</div>
+    <div class="container">
+        <h2>ChatVerse</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="post">
+            <input type="text" name="username" placeholder="Логин или ID" required>
+            <input type="password" name="password" placeholder="Пароль" required>
+            <button type="submit">Войти</button>
+        </form>
+        <p style="margin-top: 20px;"><a href="/register">Нет аккаунта? Регистрация</a></p>
+    </div>
 </body>
 </html>

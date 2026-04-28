@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -120,3 +119,66 @@
         <div class="content">
             <p><strong>📝 О себе:</strong> {{ user.bio or 'Не указано' }}</p>
             <p><strong>📅 Дата регистрации:</strong> {{ user.created_at.strftime('%d.%m.%Y') }}</p>
+            
+            {% if current_user.id != user.id %}
+                <button class="friend-btn" onclick="sendFriendRequest('{{ user.user_id_display }}')">
+                    {% if is_friend and is_friend.status == 'accepted' %}✓ В друзьях
+                    {% elif is_friend and is_friend.status == 'pending' %}⏳ Запрос отправлен
+                    {% else %}➕ Добавить в друзья{% endif %}
+                </button>
+            {% endif %}
+            
+            {% if current_user.role in ['owner', 'admin'] and current_user.id != user.id and user.role != 'owner' %}
+                <div style="margin-top: 15px;">
+                    <select id="roleSelect">
+                        <option value="user" {% if user.role == 'user' %}selected{% endif %}>Пользователь</option>
+                        <option value="helper" {% if user.role == 'helper' %}selected{% endif %}>Хелпер</option>
+                        <option value="moderator" {% if user.role == 'moderator' %}selected{% endif %}>Модератор</option>
+                        {% if current_user.role == 'owner' %}
+                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Админ</option>
+                        {% endif %}
+                    </select>
+                    <button class="admin-btn" onclick="changeRole({{ user.id }})">Выдать привилегию</button>
+                    <button class="remove-btn" onclick="removeRole({{ user.id }})">Снять привилегию</button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        function sendFriendRequest(userId) {
+            fetch('/friend_request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            }).then(res => res.json()).then(data => {
+                if (data.success) location.reload();
+                else alert(data.error);
+            });
+        }
+        
+        function changeRole(userId) {
+            const role = document.getElementById('roleSelect').value;
+            fetch('/change_role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, role: role })
+            }).then(res => res.json()).then(data => {
+                if (data.success) location.reload();
+                else alert(data.error);
+            });
+        }
+        
+        function removeRole(userId) {
+            fetch('/change_role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, role: 'user' })
+            }).then(res => res.json()).then(data => {
+                if (data.success) location.reload();
+                else alert(data.error);
+            });
+        }
+    </script>
+</body>
+</html>

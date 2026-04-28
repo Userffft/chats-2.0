@@ -20,9 +20,9 @@ os.makedirs('uploads/audio', exist_ok=True)
 os.makedirs('uploads/avatars', exist_ok=True)
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Модели
+# ------------------- МОДЕЛИ -------------------
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -95,24 +95,18 @@ def login_required(f):
 
 with app.app_context():
     db.create_all()
-    # Создаём владельца MrAizex
     if not User.query.filter_by(username='MrAizex').first():
-        owner = User(
-            username='MrAizex',
-            user_id_display=generate_user_id(),
-            password=generate_password_hash('admin123'),
-            role='owner'
-        )
+        owner = User(username='MrAizex', user_id_display=generate_user_id(),
+                     password=generate_password_hash('admin123'), role='owner')
         db.session.add(owner)
         db.session.commit()
         print("✅ Владелец MrAizex создан! Пароль: admin123")
-    # Создаём главную комнату
     if not Room.query.filter_by(name='general').first():
         general = Room(name='general', is_default=True, created_by=1)
         db.session.add(general)
         db.session.commit()
 
-# Маршруты
+# ------------------- МАРШРУТЫ -------------------
 @app.route('/')
 def index():
     if 'user_id' in session:
@@ -145,7 +139,7 @@ def register():
         if password != confirm:
             return render_template('register.html', error='Пароли не совпадают')
         if len(username) < 3:
-            return render_template('register.html', error='Слишком короткое имя')
+            return render_template('register.html', error='Имя слишком короткое')
         if User.query.filter_by(username=username).first():
             return render_template('register.html', error='Пользователь уже существует')
         uid = generate_user_id()
@@ -187,7 +181,6 @@ def user_profile(user_id):
 @login_required
 def update_profile():
     user = User.query.get(session['user_id'])
-    # Обновление аватара
     if 'avatar' in request.files:
         file = request.files['avatar']
         if file and file.filename:
@@ -226,6 +219,29 @@ def change_role():
         db.session.commit()
         return jsonify({'success':True})
     return jsonify({'error':'Недостаточно прав'}),403
+
+@app.route('/rename_room', methods=['POST'])
+@login_required
+def rename_room():
+    data = request.json
+    room_id = data.get('room_id')
+    new_name = data.get('new_name', '').strip()
+    if not new_name:
+        return jsonify({'error': 'Название не может быть пустым'}),400
+    room = Room.query.get(room_id)
+    if not room:
+        return jsonify({'error': 'Комната не найдена'}),404
+    if room.is_default:
+        return jsonify({'error': 'Главную комнату нельзя переименовать'}),400
+    user = User.query.get(session['user_id'])
+    if user.role not in ['owner','admin'] and room.created_by != session['user_id']:
+        return jsonify({'error': 'Нет прав'}),403
+    if Room.query.filter_by(name=new_name).first():
+        return jsonify({'error': 'Комната с таким именем уже существует'}),400
+    room.name = new_name
+    db.session.commit()
+    socketio.emit('room_renamed', {'room_id': room_id, 'new_name': new_name})
+    return jsonify({'success': True})
 
 @app.route('/friend_request', methods=['POST'])
 @login_required
@@ -416,7 +432,6 @@ def delete_room():
     room = Room.query.get(room_id)
     if not room or room.is_default:
         return jsonify({'error': 'Нельзя удалить главную комнату'}),400
-    # права: админ или создатель
     user = User.query.get(session['user_id'])
     if user.role not in ['owner','admin'] and room.created_by != session['user_id']:
         return jsonify({'error': 'Нет прав'}),403
@@ -455,7 +470,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# SocketIO
+# ------------------- SOCKET.IO -------------------
 @socketio.on('connect')
 def handle_connect():
     if 'user_id' in session:
@@ -484,13 +499,8 @@ def handle_message(data):
     file_type = data.get('file_type')
     if not room_id:
         return
-    msg = Message(
-        room_id=room_id,
-        user_id=session['user_id'],
-        content=text if text else None,
-        file_url=file_url,
-        file_type=file_type
-    )
+    msg = Message(room_id=room_id, user_id=session['user_id'],
+                  content=text if text else None, file_url=file_url, file_type=file_type)
     db.session.add(msg)
     db.session.commit()
     user = User.query.get(session['user_id'])
@@ -515,15 +525,10 @@ def handle_private_message(data):
     text = data.get('text', '').strip()
     if not to_user_id:
         return
-    pm = PrivateMessage(
-        from_user_id=session['user_id'],
-        to_user_id=to_user_id,
-        content=text
-    )
+    pm = PrivateMessage(from_user_id=session['user_id'], to_user_id=to_user_id, content=text)
     db.session.add(pm)
     db.session.commit()
     user = User.query.get(session['user_id'])
-    # отправить получателю
     emit('new_private_message', {
         'id': pm.id,
         'from_user_id': user.id,
@@ -531,7 +536,6 @@ def handle_private_message(data):
         'text': text,
         'timestamp': pm.timestamp.strftime('%H:%M')
     }, room=f'private_{to_user_id}')
-    # отправить отправителю
     emit('new_private_message', {
         'id': pm.id,
         'from_user_id': user.id,

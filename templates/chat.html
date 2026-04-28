@@ -7,102 +7,79 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body.dark { --bg: #1a1a2e; --sidebar: #16213e; --message-bg: #0f3460; --text: #fff; --border: #2a2a4a; --accent: #667eea; --hover: rgba(255,255,255,0.1); }
-        body.light { --bg: #f0f2f5; --sidebar: #fff; --message-bg: #e3f2fd; --text: #333; --border: #e0e0e0; --accent: #667eea; --hover: #f0f0f0; }
-        body.purple { --bg: #2d1b4e; --sidebar: #3d2b6e; --message-bg: #4d3b8e; --text: #fff; --border: #5d4bae; --accent: #c084fc; --hover: rgba(255,255,255,0.1); }
-        body.blue { --bg: #0c4a6e; --sidebar: #075985; --message-bg: #0284c7; --text: #fff; --border: #38bdf8; --accent: #38bdf8; --hover: rgba(255,255,255,0.1); }
-        
+        body.dark { --bg: #1a1a2e; --sidebar: #16213e; --message-bg: #0f3460; --text: #fff; --border: #2a2a4a; --accent: #667eea; --hover: rgba(255,255,255,0.1); --input-bg: #0f3460; }
+        body.light { --bg: #f0f2f5; --sidebar: #fff; --message-bg: #e3f2fd; --text: #333; --border: #e0e0e0; --accent: #667eea; --hover: #f0f0f0; --input-bg: #fff; }
+        body.purple { --bg: #2d1b4e; --sidebar: #3d2b6e; --message-bg: #4d3b8e; --text: #fff; --border: #5d4bae; --accent: #c084fc; --hover: rgba(255,255,255,0.1); --input-bg: #4d3b8e; }
+        body.blue { --bg: #0c4a6e; --sidebar: #075985; --message-bg: #0284c7; --text: #fff; --border: #38bdf8; --accent: #38bdf8; --hover: rgba(255,255,255,0.1); --input-bg: #0284c7; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); height: 100vh; display: flex; color: var(--text); transition: background 0.2s; }
-        
-        /* SIDEBAR */
-        .sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+        .sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow-y: auto; }
         .user-info { padding: 20px; text-align: center; background: var(--accent); cursor: pointer; transition: 0.2s; }
         .user-info:hover { opacity: 0.9; }
         .avatar { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 30px; overflow: hidden; }
         .avatar img { width: 100%; height: 100%; object-fit: cover; }
         .section { padding: 15px; border-bottom: 1px solid var(--border); }
-        .section-title { margin-bottom: 10px; font-size: 14px; opacity: 0.7; }
-        .room-item, .user-item, .friend-item { padding: 10px; margin: 5px 0; border-radius: 8px; cursor: pointer; transition: 0.1s; display: flex; align-items: center; gap: 10px; }
+        .section-title { margin-bottom: 10px; font-size: 14px; opacity: 0.7; display: flex; justify-content: space-between; align-items: center; }
+        .room-item, .user-item, .friend-item { padding: 8px 10px; margin: 4px 0; border-radius: 8px; cursor: pointer; transition: 0.1s; display: flex; align-items: center; gap: 8px; }
         .room-item:hover, .user-item:hover, .friend-item:hover { background: var(--hover); }
         .room-item.active { background: var(--accent); }
         .online-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block; }
         .offline-dot { width: 8px; height: 8px; background: #666; border-radius: 50%; display: inline-block; }
-        
-        /* CHAT */
         .chat { flex: 1; display: flex; flex-direction: column; }
-        .chat-header { padding: 20px; background: var(--sidebar); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         .messages { flex: 1; overflow-y: auto; padding: 20px; }
-        .message { margin-bottom: 15px; animation: fadeIn 0.15s ease; }
+        .message { margin-bottom: 15px; animation: fadeIn 0.1s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .message-header { margin-bottom: 5px; }
-        .message-username { font-weight: bold; color: var(--accent); cursor: pointer; margin-right: 10px; }
+        .message-header { margin-bottom: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .message-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--hover); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-size: 18px; }
+        .message-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .message-username { font-weight: bold; color: var(--accent); cursor: pointer; }
         .message-username:hover { text-decoration: underline; }
-        .timestamp { font-size: 11px; color: #888; margin-left: 10px; }
-        .role-badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
-        .role-owner { background: #ffd700; color: #333; }
-        .role-admin { background: #ff6b6b; color: white; }
-        .role-moderator { background: #4ecdc4; color: white; }
-        .role-helper { background: #45b7d1; color: white; }
-        .message-content { background: var(--message-bg); padding: 10px 15px; border-radius: 15px; display: inline-block; max-width: 70%; }
+        .timestamp { font-size: 10px; color: #888; }
+        .role-badge { font-size: 9px; padding: 2px 6px; border-radius: 10px; background: var(--accent); color: white; }
+        .message-content { background: var(--message-bg); padding: 8px 12px; border-radius: 15px; display: inline-block; max-width: 70%; margin-top: 4px; }
         .message-image { max-width: 250px; border-radius: 10px; margin-top: 5px; cursor: pointer; }
-        .typing { font-size: 12px; color: #888; padding: 5px 20px; min-height: 30px; }
+        .typing { font-size: 12px; color: #888; padding: 5px 20px; min-height: 28px; }
         .controls { padding: 15px; background: var(--sidebar); display: flex; gap: 10px; border-top: 1px solid var(--border); }
-        #messageInput { flex: 1; padding: 12px 20px; border: none; border-radius: 25px; background: var(--bg); color: var(--text); }
-        .btn { padding: 10px 20px; background: var(--accent); color: white; border: none; border-radius: 25px; cursor: pointer; transition: 0.1s; display: flex; align-items: center; gap: 5px; }
-        .btn-icon { padding: 10px 15px; background: var(--accent); border: none; border-radius: 25px; cursor: pointer; }
-        .btn:hover, .btn-icon:hover { opacity: 0.9; }
-        
-        /* MODAL */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.2s; }
-        .modal-content { background: var(--sidebar); border-radius: 20px; width: 400px; max-width: 90%; overflow: hidden; animation: slideIn 0.2s; color: var(--text); }
+        #messageInput { flex: 1; padding: 10px 15px; border: none; border-radius: 25px; background: var(--input-bg); color: var(--text); }
+        .btn { padding: 8px 16px; background: var(--accent); color: white; border: none; border-radius: 25px; cursor: pointer; transition: 0.1s; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-icon { padding: 8px 12px; background: var(--accent); border: none; border-radius: 25px; cursor: pointer; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.2s; }
+        .modal-content { background: var(--sidebar); border-radius: 20px; width: 450px; max-width: 90%; overflow: hidden; animation: slideIn 0.2s; color: var(--text); }
         @keyframes slideIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        .modal-header { padding: 20px; background: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header { padding: 15px 20px; background: var(--accent); display: flex; justify-content: space-between; align-items: center; }
         .modal-header .close { cursor: pointer; font-size: 24px; }
         .modal-body { padding: 20px; text-align: center; }
         .modal-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 40px; overflow: hidden; background: var(--hover); }
-        .modal-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
-        .modal-actions button { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; }
-        
-        /* NOTIFICATION */
-        .notification-toast { position: fixed; bottom: 20px; right: 20px; background: var(--sidebar); border-left: 4px solid var(--accent); padding: 15px 20px; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1100; animation: slideRight 0.3s; color: var(--text); }
+        .notification-toast { position: fixed; bottom: 20px; right: 20px; background: var(--sidebar); border-left: 4px solid var(--accent); padding: 12px 18px; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1100; animation: slideRight 0.3s; color: var(--text); }
         @keyframes slideRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .notification-toast .close-toast { float: right; cursor: pointer; margin-left: 15px; }
-        
-        /* SETTINGS BUTTON */
-        .settings-btn { position: fixed; bottom: 20px; left: 20px; background: var(--accent); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; transition: 0.2s; }
-        .settings-btn:hover { transform: scale(1.1); }
-        
-        /* FRIEND REQUEST BADGE */
+        .settings-btn { position: fixed; bottom: 20px; left: 20px; background: var(--accent); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; transition: 0.2s; font-size: 24px; }
         .badge { background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; margin-left: 5px; }
-        
-        /* HOVER */
-        .icon-btn { background: none; border: none; color: var(--text); cursor: pointer; font-size: 20px; padding: 5px; transition: 0.1s; }
-        .icon-btn:hover { opacity: 0.7; }
-        
+        .icon-btn { background: none; border: none; color: var(--text); cursor: pointer; font-size: 20px; padding: 5px; position: relative; }
         .header-right { display: flex; gap: 15px; align-items: center; }
+        .pm-badge { background: #4ade80; color: #000; border-radius: 12px; padding: 2px 6px; font-size: 10px; margin-left: 5px; }
+        input, select, textarea { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); }
     </style>
 </head>
 <body class="{{ user.theme }}">
     <div class="sidebar">
-        <div class="user-info" onclick="openProfileModal()">
+        <div class="user-info" onclick="openProfileModal({{ user.id }})">
             <div class="avatar">{% if user.avatar %}<img src="{{ user.avatar }}">{% else %}👤{% endif %}</div>
             <strong>{{ user.username }}</strong>
             <div style="font-size: 11px; opacity:0.7;">ID: {{ user.user_id_display }}</div>
-            <div style="font-size: 10px; margin-top: 5px;">
-                {% if user.role == 'owner' %}👑 Владелец
-                {% elif user.role == 'admin' %}⚙️ Админ
-                {% elif user.role == 'moderator' %}🛡️ Модератор
-                {% elif user.role == 'helper' %}🆘 Хелпер
-                {% else %}👤 Пользователь{% endif %}
-            </div>
+            <div style="font-size: 10px; margin-top: 5px;">{{ get_ru_role(user.role) }}</div>
         </div>
         <div class="section">
-            <div class="section-title">📌 Комнаты</div>
-            <div class="room-item active" data-room="general"># Общий чат</div>
-            <div class="room-item" data-room="random">🎲 Случайный</div>
-            <div class="room-item" data-room="help">❓ Помощь</div>
+            <div class="section-title">📌 Комнаты <span id="roomBadge"></span></div>
+            <div id="roomsList">
+                {% for room in rooms %}
+                    <div class="room-item" data-room="{{ room.name }}">{% if room.name != 'general' and room.name != 'random' and room.name != 'help' %}{{ room.name }}{% else %} 
+                        {% if room.name == 'general' %}Общий чат{% elif room.name == 'random' %}Случайный{% elif room.name == 'help' %}Помощь{% endif %}{% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% if user.role in ['owner', 'admin'] %}
+                <button class="btn" id="createRoomBtn" style="margin-top: 10px; width: 100%;">+ Создать комнату</button>
+            {% endif %}
         </div>
         <div class="section">
             <div class="section-title">👥 Друзья <span id="friendsBadge"></span></div>
@@ -118,8 +95,8 @@
         <div class="chat-header">
             <h2><span id="currentRoomName">Общий чат</span></h2>
             <div class="header-right">
-                <div id="notificationsBtn" class="icon-btn" style="position: relative;">🔔<span id="notifBadge" style="display:none;"></span></div>
-                <button class="btn" onclick="location.href='/logout'" style="padding: 8px 16px;">🚪 Выйти</button>
+                <div id="notificationsBtn" class="icon-btn">🔔<span id="notifBadge" style="display:none;"></span></div>
+                <button class="btn" onclick="location.href='/logout'">🚪 Выйти</button>
             </div>
         </div>
         <div class="messages" id="messages"></div>
@@ -141,6 +118,7 @@
         let isTyping = false;
         let currentUserId = {{ user.id }};
         let currentUserRole = '{{ user.role }}';
+        let currentPrivateChat = null;
         
         function escapeHtml(text) {
             if (!text) return '';
@@ -149,187 +127,113 @@
             return div.innerHTML;
         }
         
-        function getRoleBadge(role) {
-            const badges = {
-                'owner': '<span class="role-badge role-owner">👑 Владелец</span>',
-                'admin': '<span class="role-badge role-admin">⚙️ Админ</span>',
-                'moderator': '<span class="role-badge role-moderator">🛡️ Модератор</span>',
-                'helper': '<span class="role-badge role-helper">🆘 Хелпер</span>'
-            };
-            return badges[role] || '';
-        }
-        
-        // Уведомления тост
-        function showToast(message, type = 'info') {
+        function showToast(message) {
             const toast = document.createElement('div');
             toast.className = 'notification-toast';
-            toast.innerHTML = `<span>${message}</span><span class="close-toast" onclick="this.parentElement.remove()">✖</span>`;
+            toast.innerHTML = `<span>${escapeHtml(message)}</span><span class="close-toast" style="margin-left:15px; cursor:pointer;">✖</span>`;
+            toast.querySelector('.close-toast').onclick = () => toast.remove();
             document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 5000);
+            setTimeout(() => toast.remove(), 4000);
         }
         
-        // Модальное окно профиля
-        function openProfileModal() {
-            fetch('/get_user/{{ user.id }}')
-                .then(res => res.json())
-                .then(user => {
-                    const modal = document.createElement('div');
-                    modal.className = 'modal-overlay';
-                    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-                    modal.innerHTML = `
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3>Мой профиль</h3>
-                                <span class="close" onclick="this.closest('.modal-overlay').remove()">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <div class="modal-avatar">
-                                    ${user.avatar ? `<img src="${user.avatar}">` : '👤'}
-                                </div>
-                                <h3>${escapeHtml(user.username)}</h3>
-                                <p style="font-size: 12px;">ID: ${user.user_id_display}</p>
-                                <p><strong>📝 О себе:</strong> ${escapeHtml(user.bio) || 'Не указано'}</p>
-                                <p><strong>Роль:</strong> ${user.role}</p>
-                                <div class="modal-actions">
-                                    <button onclick="location.href='/profile'" style="background: var(--accent); color: white;">Редактировать</button>
-                                    <button onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
-                                </div>
-                            </div>
+        function openProfileModal(userId) {
+            fetch(`/get_user/${userId}`).then(res => res.json()).then(user => {
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay';
+                modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+                let roleButtons = '';
+                if (currentUserRole === 'owner' || (currentUserRole === 'admin' && user.role !== 'Владелец')) {
+                    roleButtons = `
+                        <select id="roleSelect" style="padding: 8px; margin: 10px 0; width: 100%;">
+                            <option value="user" ${user.role === 'Пользователь' ? 'selected' : ''}>Пользователь</option>
+                            <option value="helper" ${user.role === 'Помощник' ? 'selected' : ''}>Помощник</option>
+                            <option value="moderator" ${user.role === 'Модератор' ? 'selected' : ''}>Модератор</option>
+                            ${currentUserRole === 'owner' ? `<option value="admin" ${user.role === 'Администратор' ? 'selected' : ''}>Администратор</option>` : ''}
+                        </select>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="changeRole(${user.id})" style="background: #f39c12;">🎖️ Выдать</button>
+                            <button onclick="removeRole(${user.id})" style="background: #e74c3c;">⬇️ Снять</button>
                         </div>
                     `;
-                    document.body.appendChild(modal);
-                });
-        }
-        
-        // Модальное окно профиля пользователя
-        function openUserProfile(userId) {
-            fetch(`/get_user/${userId}`)
-                .then(res => res.json())
-                .then(user => {
-                    const modal = document.createElement('div');
-                    modal.className = 'modal-overlay';
-                    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-                    let roleButtons = '';
-                    if (currentUserRole === 'owner' || (currentUserRole === 'admin' && user.role !== 'owner')) {
-                        roleButtons = `
-                            <select id="roleSelect" style="padding: 8px; margin: 10px 0;">
-                                <option value="user" ${user.role === 'user' ? 'selected' : ''}>Пользователь</option>
-                                <option value="helper" ${user.role === 'helper' ? 'selected' : ''}>Хелпер</option>
-                                <option value="moderator" ${user.role === 'moderator' ? 'selected' : ''}>Модератор</option>
-                                ${currentUserRole === 'owner' ? `<option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Админ</option>` : ''}
-                            </select>
-                            <div style="display: flex; gap: 10px;">
-                                <button onclick="changeRole(${user.id})" style="background: #f39c12;">🎖️ Выдать</button>
-                                <button onclick="removeRole(${user.id})" style="background: #e74c3c;">⬇️ Снять</button>
+                }
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header"><h3>${escapeHtml(user.username)}</h3><span class="close" onclick="this.closest('.modal-overlay').remove()">&times;</span></div>
+                        <div class="modal-body">
+                            <div class="modal-avatar">${user.avatar ? `<img src="${user.avatar}">` : '👤'}</div>
+                            <h3>${escapeHtml(user.username)}</h3>
+                            <p style="font-size: 12px;">ID: ${user.user_id_display}</p>
+                            <p><strong>📝 О себе:</strong> ${escapeHtml(user.bio) || 'Не указано'}</p>
+                            <p><strong>Роль:</strong> ${user.role}</p>
+                            <div class="modal-actions" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                                <button onclick="startPrivateChat(${user.id}, '${escapeHtml(user.username)}')" style="background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 20px;">💬 Личное сообщение</button>
+                                <button onclick="sendFriendRequest(${user.id})" style="background: #4ade80; border: none; padding: 8px 16px; border-radius: 20px;">➕ Друг</button>
+                                <button onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
                             </div>
-                        `;
-                    }
-                    modal.innerHTML = `
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3>${escapeHtml(user.username)}</h3>
-                                <span class="close" onclick="this.closest('.modal-overlay').remove()">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <div class="modal-avatar">
-                                    ${user.avatar ? `<img src="${user.avatar}">` : '👤'}
-                                </div>
-                                <h3>${escapeHtml(user.username)}</h3>
-                                <p style="font-size: 12px;">ID: ${user.user_id_display}</p>
-                                <p><strong>📝 О себе:</strong> ${escapeHtml(user.bio) || 'Не указано'}</p>
-                                <p><strong>Роль:</strong> ${user.role}</p>
-                                <div class="modal-actions">
-                                    <button onclick="sendFriendRequest(${user.id})" style="background: var(--accent); color: white;">➕ Добавить в друзья</button>
-                                    <button onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
-                                </div>
-                                ${roleButtons}
-                            </div>
-                        </div>
-                    `;
-                    document.body.appendChild(modal);
-                });
-        }
-        
-        // Модальное окно настроек (темы)
-        function openSettingsModal() {
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>⚙️ Настройки</h3>
-                        <span class="close" onclick="this.closest('.modal-overlay').remove()">&times;</span>
-                    </div>
-                    <div class="modal-body">
-                        <h4>🎨 Тема оформления</h4>
-                        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                            <button onclick="changeTheme('dark')" style="background: #1a1a2e; color: white; padding: 10px 20px; border: none; border-radius: 10px;">🌙 Тёмная</button>
-                            <button onclick="changeTheme('light')" style="background: #f0f2f5; color: #333; padding: 10px 20px; border: none; border-radius: 10px;">☀️ Светлая</button>
-                            <button onclick="changeTheme('purple')" style="background: #2d1b4e; color: white; padding: 10px 20px; border: none; border-radius: 10px;">💜 Фиолетовая</button>
-                            <button onclick="changeTheme('blue')" style="background: #0c4a6e; color: white; padding: 10px 20px; border: none; border-radius: 10px;">💙 Синяя</button>
+                            ${roleButtons}
                         </div>
                     </div>
+                `;
+                document.body.appendChild(modal);
+            });
+        }
+        
+        function startPrivateChat(userId, username) {
+            currentPrivateChat = { id: userId, username: username };
+            currentRoom = null;
+            document.getElementById('currentRoomName').innerHTML = `💬 Личный чат с ${escapeHtml(username)}`;
+            document.getElementById('messages').innerHTML = '';
+            fetch(`/get_private_messages/${userId}`).then(res => res.json()).then(messages => {
+                messages.forEach(msg => addPrivateMessage(msg));
+            });
+            socket.emit('join_private', { user_id: userId });
+            showToast(`Вы перешли в личный чат с ${username}`);
+        }
+        
+        function addPrivateMessage(msg) {
+            const isMine = msg.from_user_id === currentUserId;
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.style.textAlign = isMine ? 'right' : 'left';
+            div.innerHTML = `
+                <div style="display: flex; justify-content: ${isMine ? 'flex-end' : 'flex-start'}; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    ${!isMine ? `<div class="message-avatar">${msg.avatar ? `<img src="${msg.avatar}">` : '👤'}</div>` : ''}
+                    <span class="message-username" style="cursor: pointer;" onclick="openProfileModal(${msg.from_user_id})">${escapeHtml(msg.from_user)}</span>
+                    <span class="timestamp">${msg.timestamp}</span>
+                    ${isMine ? `<div class="message-avatar">${msg.avatar ? `<img src="${msg.avatar}">` : '👤'}</div>` : ''}
+                </div>
+                <div class="message-content" style="background: ${isMine ? 'var(--accent)' : 'var(--message-bg)'}; max-width: 70%; display: inline-block;">
+                    ${msg.content ? `<p>${escapeHtml(msg.content)}</p>` : ''}
+                    ${msg.file_url ? `<img class="message-image" src="${msg.file_url}" onclick="showImagePreview('${msg.file_url}')">` : ''}
                 </div>
             `;
-            document.body.appendChild(modal);
-        }
-        
-        function changeTheme(theme) {
-            document.body.className = theme;
-            fetch('/update_profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `theme=${theme}`
-            }).then(() => showToast(`Тема изменена на ${theme}`, 'success'));
-            document.querySelector('.modal-overlay')?.remove();
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
         
         function changeRole(userId) {
             const role = document.getElementById('roleSelect').value;
-            fetch('/change_role', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, role: role })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    showToast('Роль изменена!');
-                    location.reload();
-                } else alert(data.error);
-            });
+            fetch('/change_role', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, role: role }) })
+                .then(res => res.json()).then(data => { if (data.success) { showToast('Роль изменена'); location.reload(); } else alert(data.error); });
         }
-        
         function removeRole(userId) {
-            fetch('/change_role', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, role: 'user' })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    showToast('Привилегия снята!');
-                    location.reload();
-                } else alert(data.error);
-            });
+            fetch('/change_role', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, role: 'user' }) })
+                .then(res => res.json()).then(data => { if (data.success) { showToast('Привилегия снята'); location.reload(); } else alert(data.error); });
         }
-        
         function sendFriendRequest(userId) {
-            fetch('/friend_request', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            }).then(res => res.json()).then(data => {
-                if (data.success) showToast('Запрос отправлен!');
-                else showToast(data.error, 'error');
-            });
+            fetch('/friend_request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })
+                .then(res => res.json()).then(data => { if (data.success) showToast('Запрос отправлен'); else showToast(data.error); });
         }
         
         function addMessage(msg) {
+            if (currentRoom === null) return;
             const div = document.createElement('div');
             div.className = 'message';
             div.innerHTML = `
                 <div class="message-header">
-                    <span class="message-username" onclick="openUserProfile(${msg.user_id})">${escapeHtml(msg.username)}</span>
-                    ${getRoleBadge(msg.user_role)}
+                    <div class="message-avatar">${msg.avatar ? `<img src="${msg.avatar}">` : '👤'}</div>
+                    <span class="message-username" onclick="openProfileModal(${msg.user_id})">${escapeHtml(msg.username)}</span>
+                    <span class="role-badge">${msg.user_role}</span>
                     <span class="timestamp">${msg.timestamp}</span>
                 </div>
                 <div class="message-content">
@@ -367,7 +271,7 @@
                 users.forEach(user => {
                     if (user.id !== currentUserId) {
                         container.innerHTML += `
-                            <div class="user-item" onclick="openUserProfile(${user.id})">
+                            <div class="user-item" onclick="openProfileModal(${user.id})">
                                 <span class="${user.status === 'online' ? 'online-dot' : 'offline-dot'}"></span>
                                 ${escapeHtml(user.username)}
                                 <span style="font-size: 10px; margin-left: auto;">${user.user_id_display}</span>
@@ -381,18 +285,10 @@
         function loadFriends() {
             fetch('/get_friends').then(res => res.json()).then(friends => {
                 const container = document.getElementById('friendsList');
-                if (friends.length === 0) {
-                    container.innerHTML = '<div style="font-size: 12px; opacity: 0.7;">Нет друзей</div>';
-                    return;
-                }
+                if (friends.length === 0) { container.innerHTML = '<div style="font-size: 12px; opacity: 0.7;">Нет друзей</div>'; return; }
                 container.innerHTML = '';
                 friends.forEach(friend => {
-                    container.innerHTML += `
-                        <div class="friend-item" onclick="openUserProfile(${friend.id})">
-                            <span class="${friend.status === 'online' ? 'online-dot' : 'offline-dot'}"></span>
-                            ${escapeHtml(friend.username)}
-                        </div>
-                    `;
+                    container.innerHTML += `<div class="friend-item" onclick="startPrivateChat(${friend.id}, '${escapeHtml(friend.username)}')"><span class="${friend.status === 'online' ? 'online-dot' : 'offline-dot'}"></span>${escapeHtml(friend.username)}</div>`;
                 });
             });
         }
@@ -400,82 +296,85 @@
         function loadNotifications() {
             fetch('/get_notifications').then(res => res.json()).then(notifs => {
                 const badge = document.getElementById('notifBadge');
-                if (notifs.length > 0) {
-                    badge.innerHTML = notifs.length;
-                    badge.style.display = 'inline-block';
-                    badge.style.background = 'red';
-                    badge.style.color = 'white';
-                    badge.style.borderRadius = '50%';
-                    badge.style.padding = '2px 6px';
-                    badge.style.fontSize = '10px';
-                    badge.style.position = 'absolute';
-                    badge.style.top = '-5px';
-                    badge.style.right = '-10px';
-                } else {
-                    badge.style.display = 'none';
-                }
+                if (notifs.length > 0) { badge.innerHTML = notifs.length; badge.style.display = 'inline-block'; badge.style.background = 'red'; badge.style.borderRadius = '50%'; badge.style.padding = '2px 6px'; badge.style.fontSize = '10px'; badge.style.position = 'absolute'; badge.style.top = '-5px'; badge.style.right = '-10px'; }
+                else { badge.style.display = 'none'; }
             });
         }
         
         function loadFriendRequests() {
             fetch('/get_friend_requests').then(res => res.json()).then(requests => {
                 const badge = document.getElementById('friendsBadge');
-                if (requests.length > 0) {
-                    badge.innerHTML = `<span class="badge">${requests.length}</span>`;
-                    showToast(`📩 У вас ${requests.length} ${requests.length === 1 ? 'заявка' : 'заявок'} в друзья`);
-                } else {
-                    badge.innerHTML = '';
-                }
+                if (requests.length > 0) { badge.innerHTML = `<span class="badge">${requests.length}</span>`; showToast(`📩 У вас ${requests.length} заявка в друзья`); }
+                else { badge.innerHTML = ''; }
             });
+        }
+        
+        function openSettingsModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header"><h3>⚙️ Настройки</h3><span class="close" onclick="this.closest('.modal-overlay').remove()">&times;</span></div>
+                    <div class="modal-body">
+                        <h4>🎨 Тема оформления</h4>
+                        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 15px;">
+                            <button onclick="changeTheme('dark')" style="background: #1a1a2e; color: white; padding: 8px 16px; border: none; border-radius: 20px;">🌙 Тёмная</button>
+                            <button onclick="changeTheme('light')" style="background: #f0f2f5; color: #333; padding: 8px 16px; border: none; border-radius: 20px;">☀️ Светлая</button>
+                            <button onclick="changeTheme('purple')" style="background: #2d1b4e; color: white; padding: 8px 16px; border: none; border-radius: 20px;">💜 Фиолетовая</button>
+                            <button onclick="changeTheme('blue')" style="background: #0c4a6e; color: white; padding: 8px 16px; border: none; border-radius: 20px;">💙 Синяя</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function changeTheme(theme) {
+            document.body.className = theme;
+            fetch('/update_profile', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `theme=${theme}` });
+            showToast(`Тема изменена на ${theme}`);
+            document.querySelector('.modal-overlay')?.remove();
         }
         
         // Socket events
         socket.on('new_message', (msg) => {
-            if (msg.room === currentRoom) addMessage(msg);
+            if (currentRoom !== null && msg.room === currentRoom) addMessage(msg);
         });
-        
-        socket.on('user_online', (data) => { loadUsers(); loadFriends(); });
-        socket.on('user_offline', (data) => { loadUsers(); loadFriends(); });
+        socket.on('private_message', (msg) => {
+            if (currentPrivateChat && msg.from_user_id === currentPrivateChat.id) {
+                addPrivateMessage({ ...msg, from_user_id: msg.from_user_id, from_user: msg.from_user, avatar: null });
+            } else {
+                showToast(`💬 Новое личное сообщение от ${msg.from_user}`);
+                loadNotifications();
+            }
+        });
+        socket.on('user_online', () => { loadUsers(); loadFriends(); });
+        socket.on('user_offline', () => { loadUsers(); loadFriends(); });
         socket.on('user_typing', (data) => {
             const typingDiv = document.getElementById('typingIndicator');
-            if (data.is_typing) {
-                typingDiv.innerHTML = `${escapeHtml(data.username)} печатает...`;
-                setTimeout(() => { if (typingDiv.innerHTML.includes(data.username)) typingDiv.innerHTML = ''; }, 2000);
-            }
-        });
-        
-        socket.on('new_notification', (data) => {
-            if (data.user_id === currentUserId) {
-                showToast(data.content);
-                loadNotifications();
-                loadFriendRequests();
-            }
+            if (data.is_typing) { typingDiv.innerHTML = `${escapeHtml(data.username)} печатает...`; setTimeout(() => { if (typingDiv.innerHTML.includes(data.username)) typingDiv.innerHTML = ''; }, 2000); }
         });
         
         // Send message
         document.getElementById('sendBtn').onclick = () => {
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
-            if (text) {
-                socket.emit('message', { text, room: currentRoom });
-                input.value = '';
+            if (currentPrivateChat) {
+                if (text) {
+                    fetch('/send_private_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to_user_id: currentPrivateChat.id, content: text }) });
+                    addPrivateMessage({ from_user_id: currentUserId, from_user: '{{ user.username }}', content: text, timestamp: new Date().toLocaleTimeString().slice(0,5), avatar: null });
+                    input.value = '';
+                }
+            } else {
+                if (text) { socket.emit('message', { text, room: currentRoom }); input.value = ''; }
             }
         };
-        
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') document.getElementById('sendBtn').click();
-        });
-        
+        document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('sendBtn').click(); });
         document.getElementById('messageInput').addEventListener('input', () => {
-            if (!isTyping) {
-                isTyping = true;
-                socket.emit('typing', { room: currentRoom, is_typing: true });
-            }
+            if (!isTyping && !currentPrivateChat) { isTyping = true; socket.emit('typing', { room: currentRoom, is_typing: true }); }
             clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                isTyping = false;
-                socket.emit('typing', { room: currentRoom, is_typing: false });
-            }, 1000);
+            typingTimeout = setTimeout(() => { if (!currentPrivateChat) { isTyping = false; socket.emit('typing', { room: currentRoom, is_typing: false }); } }, 1000);
         });
         
         // Image upload
@@ -489,19 +388,51 @@
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.file_url) {
-                    socket.emit('message', { file_url: data.file_url, file_type: 'image', room: currentRoom });
+                    if (currentPrivateChat) {
+                        fetch('/send_private_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to_user_id: currentPrivateChat.id, file_url: data.file_url, file_type: 'image' }) });
+                        addPrivateMessage({ from_user_id: currentUserId, from_user: '{{ user.username }}', file_url: data.file_url, file_type: 'image', timestamp: new Date().toLocaleTimeString().slice(0,5), avatar: null });
+                    } else {
+                        socket.emit('message', { file_url: data.file_url, file_type: 'image', room: currentRoom });
+                    }
                 }
             }
             document.getElementById('imageInput').value = '';
         };
         
-        // Notifications button
+        // Room management
+        document.getElementById('createRoomBtn')?.addEventListener('click', () => {
+            let name = prompt('Введите название комнаты (латиницей или цифрами)');
+            if (name) {
+                name = name.trim().toLowerCase().replace(/\s+/g, '_');
+                fetch('/create_room', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) })
+                    .then(res => res.json()).then(data => { if (data.success) location.reload(); else alert(data.error); });
+            }
+        });
+        document.querySelectorAll('.room-item').forEach(room => {
+            room.onclick = () => {
+                document.querySelectorAll('.room-item').forEach(r => r.classList.remove('active'));
+                room.classList.add('active');
+                const roomName = room.getAttribute('data-room') || room.innerText.trim().toLowerCase().replace(' ', '_');
+                currentRoom = roomName;
+                currentPrivateChat = null;
+                document.getElementById('currentRoomName').innerHTML = room.innerText.trim();
+                loadMessages(currentRoom);
+                socket.emit('join', { room: currentRoom });
+                if (currentUserRole === 'owner' || currentUserRole === 'admin') {
+                    if (roomName !== 'general' && roomName !== 'random' && roomName !== 'help') {
+                        if (confirm('Удалить эту комнату?')) {
+                            fetch('/delete_room', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_name: roomName }) })
+                                .then(res => res.json()).then(data => { if (data.success) location.reload(); else alert(data.error); });
+                        }
+                    }
+                }
+            };
+        });
+        
+        // Notifications
         document.getElementById('notificationsBtn').onclick = () => {
             fetch('/get_notifications').then(res => res.json()).then(notifs => {
-                if (notifs.length === 0) {
-                    showToast('Нет уведомлений');
-                    return;
-                }
+                if (notifs.length === 0) { showToast('Нет уведомлений'); return; }
                 const modal = document.createElement('div');
                 modal.className = 'modal-overlay';
                 modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
@@ -509,23 +440,11 @@
                 notifs.forEach(n => {
                     if (n.type === 'friend_request') {
                         const data = JSON.parse(n.data || '{}');
-                        html += `
-                            <div style="padding: 10px; border-bottom: 1px solid var(--border);">
-                                <p>${escapeHtml(n.content)}</p>
-                                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                                    <button onclick="acceptFriend(${data.request_id})" style="background: #4ade80; color: white; border: none; padding: 5px 15px; border-radius: 5px;">Принять</button>
-                                    <button onclick="declineFriend(${data.request_id})" style="background: #ef4444; color: white; border: none; padding: 5px 15px; border-radius: 5px;">Отклонить</button>
-                                </div>
-                            </div>
-                        `;
+                        html += `<div style="padding: 10px; border-bottom: 1px solid var(--border);"><p>${escapeHtml(n.content)}</p><div style="display: flex; gap: 10px; margin-top: 10px;"><button onclick="acceptFriend(${data.request_id})" style="background: #4ade80; border: none; padding: 5px 15px; border-radius: 5px;">Принять</button><button onclick="declineFriend(${data.request_id})" style="background: #ef4444; border: none; padding: 5px 15px; border-radius: 5px;">Отклонить</button></div></div>`;
                     } else {
                         html += `<div style="padding: 10px; border-bottom: 1px solid var(--border);"><p>${escapeHtml(n.content)}</p><small>${n.created_at}</small></div>`;
                     }
-                    fetch('/mark_notification_read', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ notification_id: n.id })
-                    });
+                    fetch('/mark_notification_read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notification_id: n.id }) });
                 });
                 html += `</div></div>`;
                 modal.innerHTML = html;
@@ -533,43 +452,8 @@
                 loadNotifications();
             });
         };
-        
-        window.acceptFriend = (requestId) => {
-            fetch('/accept_friend', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ request_id: requestId })
-            }).then(() => {
-                showToast('Запрос принят!');
-                loadFriends();
-                loadFriendRequests();
-                document.querySelector('.modal-overlay')?.remove();
-            });
-        };
-        
-        window.declineFriend = (requestId) => {
-            fetch('/decline_friend', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ request_id: requestId })
-            }).then(() => {
-                showToast('Запрос отклонён');
-                loadFriendRequests();
-                document.querySelector('.modal-overlay')?.remove();
-            });
-        };
-        
-        // Room switching
-        document.querySelectorAll('.room-item').forEach(room => {
-            room.onclick = () => {
-                document.querySelectorAll('.room-item').forEach(r => r.classList.remove('active'));
-                room.classList.add('active');
-                currentRoom = room.getAttribute('data-room');
-                document.getElementById('currentRoomName').innerText = room.innerText.trim();
-                loadMessages(currentRoom);
-                socket.emit('join', { room: currentRoom });
-            };
-        });
+        window.acceptFriend = (id) => { fetch('/accept_friend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request_id: id }) }).then(() => { showToast('Запрос принят'); loadFriends(); loadFriendRequests(); document.querySelector('.modal-overlay')?.remove(); }); };
+        window.declineFriend = (id) => { fetch('/decline_friend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request_id: id }) }).then(() => { showToast('Запрос отклонён'); loadFriendRequests(); document.querySelector('.modal-overlay')?.remove(); }); };
         
         // Initial load
         loadMessages('general');
@@ -578,6 +462,7 @@
         loadFriendRequests();
         loadNotifications();
         setInterval(() => { loadUsers(); loadFriends(); loadNotifications(); loadFriendRequests(); }, 5000);
+        socket.emit('join', { room: 'general' });
     </script>
 </body>
 </html>

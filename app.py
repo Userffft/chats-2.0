@@ -39,7 +39,7 @@ class User(db.Model):
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_avatar_change = db.Column(db.DateTime, default=None)
-    theme = db.Column(db.String(20), default='dark')  # dark, light, purple, blue
+    theme = db.Column(db.String(20), default='dark')  # Добавлено поле theme
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -67,16 +67,25 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Создание таблиц
+# Создание таблиц с проверкой
 with app.app_context():
     db.create_all()
-    # Добавляем колонку theme если её нет
+    # Добавляем колонку theme если её нет (для старых пользователей)
     try:
         from sqlalchemy import text
         db.session.execute(text('ALTER TABLE user ADD COLUMN theme VARCHAR(20) DEFAULT "dark"'))
         db.session.commit()
+        print("Колонка theme добавлена")
     except Exception as e:
-        print("Колонка theme уже существует или ошибка:", e)
+        print("Колонка theme уже существует:", e)
+    
+    # Обновляем существующих пользователей
+    users = User.query.all()
+    for user in users:
+        if user.theme is None:
+            user.theme = 'dark'
+    db.session.commit()
+
 # ============ HTML ШАБЛОНЫ ============
 
 LOGIN_TEMPLATE = '''
@@ -316,7 +325,7 @@ REGISTER_TEMPLATE = '''
 </html>
 '''
 
-# Функция для генерации HTML чата с поддержкой тем
+# Функция для генерации HTML чата
 def get_chat_template():
     return '''
 <!DOCTYPE html>
@@ -328,18 +337,6 @@ def get_chat_template():
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style id="theme-style">
-        /* Тема по умолчанию - Dark */
-        :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --bg-card: #0f3460;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --accent: #667eea;
-            --accent-hover: #764ba2;
-            --border: #2a2a4a;
-            --message-bg: #0f3460;
-        }
         body.dark {
             --bg-primary: #1a1a2e;
             --bg-secondary: #16213e;
@@ -347,7 +344,6 @@ def get_chat_template():
             --text-primary: #ffffff;
             --text-secondary: #a0a0a0;
             --accent: #667eea;
-            --accent-hover: #764ba2;
             --border: #2a2a4a;
             --message-bg: #0f3460;
         }
@@ -358,7 +354,6 @@ def get_chat_template():
             --text-primary: #1a1a2e;
             --text-secondary: #666666;
             --accent: #667eea;
-            --accent-hover: #764ba2;
             --border: #e0e0e0;
             --message-bg: #ffffff;
         }
@@ -369,7 +364,6 @@ def get_chat_template():
             --text-primary: #ffffff;
             --text-secondary: #d0c0ff;
             --accent: #c084fc;
-            --accent-hover: #a855f7;
             --border: #5d4bae;
             --message-bg: #4d3b8e;
         }
@@ -380,7 +374,6 @@ def get_chat_template():
             --text-primary: #ffffff;
             --text-secondary: #bae6fd;
             --accent: #38bdf8;
-            --accent-hover: #0ea5e9;
             --border: #38bdf8;
             --message-bg: #0284c7;
         }
@@ -405,7 +398,6 @@ def get_chat_template():
             background: var(--accent);
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
         }
         .avatar {
             width: 80px;
@@ -419,14 +411,12 @@ def get_chat_template():
             font-size: 40px;
             overflow: hidden;
         }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .rooms, .online-users { padding: 20px; border-bottom: 1px solid var(--border); }
+        .rooms, .online-users, .theme-selector { padding: 20px; border-bottom: 1px solid var(--border); }
         .room-item {
             padding: 12px;
             margin: 5px 0;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -452,15 +442,11 @@ def get_chat_template():
             overflow-y: auto;
             padding: 20px;
         }
-        .message {
-            margin-bottom: 15px;
-            animation: fadeIn 0.3s ease-out;
-        }
+        .message { margin-bottom: 15px; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .message-header { margin-bottom: 5px; }
         .username { font-weight: bold; color: var(--accent); margin-right: 10px; }
         .timestamp { font-size: 11px; color: var(--text-secondary); }
         .message-content {
@@ -482,14 +468,8 @@ def get_chat_template():
             padding: 12px 20px;
             border: 1px solid var(--border);
             border-radius: 25px;
-            font-size: 14px;
             background: var(--bg-primary);
             color: var(--text-primary);
-        }
-        .typing-indicator {
-            font-size: 12px;
-            color: var(--text-secondary);
-            padding: 5px 20px;
         }
         button {
             padding: 10px 18px;
@@ -498,19 +478,9 @@ def get_chat_template():
             border: none;
             border-radius: 25px;
             cursor: pointer;
-            transition: all 0.3s;
         }
-        button:hover { transform: translateY(-1px); opacity: 0.9; }
-        .theme-selector {
-            padding: 20px;
-            border-top: 1px solid var(--border);
-        }
-        .theme-btn {
-            padding: 8px 12px;
-            margin: 3px;
-            font-size: 12px;
-        }
-        @media (max-width: 768px) { .sidebar { display: none; } .message-content { max-width: 90%; } }
+        .theme-btn { padding: 8px 12px; margin: 3px; font-size: 12px; }
+        @media (max-width: 768px) { .sidebar { display: none; } }
     </style>
 </head>
 <body class="{{ theme }}">
@@ -519,7 +489,7 @@ def get_chat_template():
             <div class="user-profile" onclick="window.location.href='/profile'">
                 <div class="avatar">👤</div>
                 <strong>{{ username }}</strong>
-                <div class="user-id-badge" style="font-size:12px; opacity:0.8;">ID: {{ user_id_display }}</div>
+                <div style="font-size:12px;">ID: {{ user_id_display }}</div>
             </div>
             <div class="rooms">
                 <h4><i class="fas fa-hashtag"></i> Комнаты</h4>
@@ -577,9 +547,7 @@ def get_chat_template():
     <script>
         const socket = io();
         let currentRoom = 'general';
-        let typingTimeout;
-        let isTyping = false;
-
+        
         function changeTheme(theme) {
             document.body.className = theme;
             fetch('/change_theme', {
@@ -614,27 +582,7 @@ def get_chat_template():
             return div.innerHTML;
         }
 
-        socket.on('new_message', (msg) => {
-            if (currentRoom === msg.room || !msg.room) {
-                appendMessage(msg);
-            }
-        });
-
-        socket.on('user_online', (data) => {
-            updateUsersList();
-        });
-
-        socket.on('user_offline', (data) => {
-            updateUsersList();
-        });
-
-        socket.on('user_typing', (data) => {
-            const indicator = document.getElementById('typingIndicator');
-            if (data.is_typing) {
-                indicator.innerHTML = `<i class="fas fa-ellipsis-h"></i> ${escapeHtml(data.username)} печатает...`;
-                setTimeout(() => { if (indicator.innerHTML.includes(data.username)) indicator.innerHTML = ''; }, 2000);
-            }
-        });
+        socket.on('new_message', (msg) => { appendMessage(msg); });
 
         function updateUsersList() {
             fetch('/get_users')
@@ -648,10 +596,10 @@ def get_chat_template():
                             const isOnline = user.status === 'online';
                             if (isOnline) onlineCount++;
                             container.innerHTML += `
-                                <div class="user-item" style="padding:10px; display:flex; align-items:center; gap:10px;">
+                                <div style="padding:10px; display:flex; align-items:center; gap:10px;">
                                     <div style="width:10px; height:10px; background:${isOnline ? '#4ade80' : '#a0a0a0'}; border-radius:50%;"></div>
                                     <span>${escapeHtml(user.username)}</span>
-                                    <small style="margin-left:auto; font-size:10px;">${user.user_id_display}</small>
+                                    <small style="margin-left:auto;">${user.user_id_display}</small>
                                 </div>
                             `;
                         }
@@ -660,38 +608,16 @@ def get_chat_template():
                 });
         }
 
-        const sendBtn = document.getElementById('sendBtn');
-        const messageInput = document.getElementById('messageInput');
-        
-        sendBtn.onclick = () => {
-            const text = messageInput.value.trim();
+        document.getElementById('sendBtn').onclick = () => {
+            const text = document.getElementById('messageInput').value.trim();
             if (text) {
                 socket.emit('message', { text, room: currentRoom });
-                messageInput.value = '';
+                document.getElementById('messageInput').value = '';
             }
         };
 
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendBtn.click();
-        });
-
-        messageInput.addEventListener('input', () => {
-            if (!isTyping) {
-                isTyping = true;
-                socket.emit('typing', { room: currentRoom, is_typing: true });
-            }
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                isTyping = false;
-                socket.emit('typing', { room: currentRoom, is_typing: false });
-            }, 1000);
-        });
-
-        const uploadImageBtn = document.getElementById('uploadImageBtn');
-        const imageInput = document.getElementById('imageInput');
-        
-        uploadImageBtn.onclick = () => imageInput.click();
-        imageInput.onchange = async (e) => {
+        document.getElementById('uploadImageBtn').onclick = () => document.getElementById('imageInput').click();
+        document.getElementById('imageInput').onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const formData = new FormData();
@@ -701,7 +627,7 @@ def get_chat_template():
             if (data.file_url) {
                 socket.emit('message', { file_url: data.file_url, file_type: 'image', room: currentRoom });
             }
-            imageInput.value = '';
+            document.getElementById('imageInput').value = '';
         };
 
         document.querySelectorAll('.room-item').forEach(room => {
@@ -710,20 +636,21 @@ def get_chat_template():
                 room.classList.add('active');
                 currentRoom = room.getAttribute('data-room');
                 document.getElementById('currentRoom').innerText = room.querySelector('span').innerText;
-                socket.emit('join', { room: currentRoom });
                 fetch(`/get_messages?room=${currentRoom}`)
                     .then(res => res.json())
                     .then(messages => {
-                        const messagesDiv = document.getElementById('messages');
-                        messagesDiv.innerHTML = '';
+                        document.getElementById('messages').innerHTML = '';
                         messages.forEach(msg => appendMessage(msg));
                     });
             };
         });
 
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('sendBtn').click();
+        });
+
         updateUsersList();
         setInterval(updateUsersList, 5000);
-        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
     </script>
 </body>
 </html>
@@ -780,7 +707,8 @@ def register():
             username=username,
             user_id_display=user_id_display,
             password=hashed_password,
-            bio=bio
+            bio=bio,
+            theme='dark'
         )
         db.session.add(user)
         db.session.commit()
@@ -843,6 +771,125 @@ def change_theme():
     db.session.commit()
     return jsonify({'status': 'ok'})
 
+PROFILE_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль - ChatVerse</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .avatar {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .form-container { padding: 40px; }
+        .form-group { margin-bottom: 25px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; }
+        input, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #666;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            text-align: center;
+        }
+        .user-id { font-family: monospace; font-size: 18px; font-weight: bold; color: #667eea; }
+        .warning { background: #fff3e0; color: #e67e22; padding: 10px; border-radius: 8px; font-size: 12px; margin-top: 10px; }
+        .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .error { background: #fee; color: #c33; padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="avatar">
+                {% if user.avatar %}
+                    <img src="{{ user.avatar }}" alt="avatar">
+                {% else %}
+                    <div style="font-size: 50px;">👤</div>
+                {% endif %}
+            </div>
+            <h2>{{ user.username }}</h2>
+            <p>ID: <span class="user-id">{{ user.user_id_display }}</span></p>
+        </div>
+        <div class="form-container">
+            {% if success %}<div class="success">{{ success }}</div>{% endif %}
+            {% if error %}<div class="error">{{ error }}</div>{% endif %}
+            
+            <form method="post" enctype="multipart/form-data" action="/update_profile">
+                <div class="form-group">
+                    <label>📷 Аватар</label>
+                    <input type="file" name="avatar" accept="image/*">
+                    {% if can_change_avatar %}
+                        <div class="warning">✅ Вы можете сменить аватар</div>
+                    {% else %}
+                        <div class="warning">⏰ Следующая смена аватара через {{ days_left }} дн.</div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <label>📝 О себе</label>
+                    <textarea name="bio">{{ user.bio }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>🔒 Новый пароль</label>
+                    <input type="password" name="new_password" placeholder="Оставьте пустым, если не хотите менять">
+                </div>
+                <button type="submit">Сохранить изменения</button>
+            </form>
+            <a href="/chat" class="back-btn">← Вернуться в чат</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
 @app.route('/profile')
 @login_required
 def profile():
@@ -892,6 +939,7 @@ def update_profile():
         success = success or '✅ Пароль изменен!'
     
     db.session.commit()
+    
     can_change_avatar = True
     days_left = 0
     if user.last_avatar_change:
@@ -945,8 +993,7 @@ def handle_connect():
             db.session.commit()
             emit('user_online', {
                 'user_id': user.id,
-                'username': user.username,
-                'user_id_display': user.user_id_display
+                'username': user.username
             }, broadcast=True)
 
 @socketio.on('disconnect')
@@ -958,15 +1005,6 @@ def handle_disconnect():
             user.last_seen = datetime.utcnow()
             db.session.commit()
             emit('user_offline', {'user_id': user.id}, broadcast=True)
-
-@socketio.on('typing')
-def handle_typing(data):
-    if 'user_id' in session:
-        room = data.get('room', 'general')
-        emit('user_typing', {
-            'username': session['username'],
-            'is_typing': data.get('is_typing', False)
-        }, room=room, include_self=False)
 
 @socketio.on('message')
 def handle_message(data):
@@ -993,7 +1031,6 @@ def handle_message(data):
     emit('new_message', {
         'id': msg.id,
         'username': user.username,
-        'user_id_display': user.user_id_display,
         'text': text,
         'file_url': file_url,
         'file_type': file_type,
@@ -1005,154 +1042,6 @@ def handle_message(data):
 def handle_join(data):
     room = data.get('room', 'general')
     join_room(room)
-
-PROFILE_TEMPLATE = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Профиль - ChatVerse</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: rgba(255,255,255,0.95);
-            border-radius: 30px;
-            box-shadow: 0 30px 70px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-        }
-        .avatar {
-            width: 100px;
-            height: 100px;
-            background: white;
-            border-radius: 50%;
-            margin: 0 auto 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .form-container { padding: 40px; }
-        .form-group { margin-bottom: 25px; }
-        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; }
-        input, textarea {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            font-size: 14px;
-        }
-        textarea { resize: vertical; min-height: 80px; }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        .back-btn {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #666;
-            color: white;
-            text-decoration: none;
-            border-radius: 25px;
-            text-align: center;
-        }
-        .user-id {
-            font-family: monospace;
-            font-size: 18px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        .warning {
-            background: #fff3e0;
-            color: #e67e22;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .error {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="avatar">
-                {% if user.avatar %}
-                    <img src="{{ user.avatar }}" alt="avatar">
-                {% else %}
-                    <div style="font-size: 50px;">👤</div>
-                {% endif %}
-            </div>
-            <h2>{{ user.username }}</h2>
-            <p>ID: <span class="user-id">{{ user.user_id_display }}</span></p>
-        </div>
-        <div class="form-container">
-            {% if success %}<div class="success">{{ success }}</div>{% endif %}
-            {% if error %}<div class="error">{{ error }}</div>{% endif %}
-            
-            <form method="post" enctype="multipart/form-data" action="/update_profile">
-                <div class="form-group">
-                    <label>📷 Аватар</label>
-                    <input type="file" name="avatar" accept="image/*">
-                    {% if can_change_avatar %}
-                        <div class="warning">✅ Вы можете сменить аватар (бесплатно)</div>
-                    else>
-                        <div class="warning">⏰ Следующая смена аватара через {{ days_left }} дн.</div>
-                    {% endif %}
-                </div>
-                <div class="form-group">
-                    <label>📝 О себе</label>
-                    <textarea name="bio">{{ user.bio }}</textarea>
-                </div>
-                <div class="form-group">
-                    <label>🔒 Новый пароль</label>
-                    <input type="password" name="new_password" placeholder="Оставьте пустым, если не хотите менять">
-                </div>
-                <button type="submit">Сохранить изменения</button>
-            </form>
-            <a href="/chat" class="back-btn">← Вернуться в чат</a>
-        </div>
-    </div>
-</body>
-</html>
-'''
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
